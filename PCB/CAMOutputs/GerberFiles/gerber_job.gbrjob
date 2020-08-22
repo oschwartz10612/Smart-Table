@@ -1,0 +1,24 @@
+{
+    "Header": {
+        "Comment": "All values are metric (mm)",
+        "CreationDate": "2020-08-14T22:19:36Z",
+        "GenerationSoftware": {
+            "Application": "EAGLE",
+            "Vendor": "Autodesk",
+            "Version": "9.7.0"
+        },
+        "Part": "Single"
+    },
+    "Overall": {
+        "BoardThickness": 1.57,
+        "LayerNumber": 2,
+        "Name": {
+            "ProjectId": "control PCB v14"
+        },
+        "Owner": "Owen Schwartz <oschwartz10612@gmail.com>",
+        "Size": {
+            "X": 73.45,
+            "Y": 49.28
+        }
+    }
+}
