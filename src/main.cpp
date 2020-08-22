@@ -11,13 +11,21 @@ const char *mqtt_server = MQTT_SERVER;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
-unsigned long lastMsg = 0;
+unsigned long aliveMsg = 0;
+unsigned long eventLoop = 0;
 
 #define STEPPIN 14
 #define DIRPIN 4
 #define EPIN 5
 
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
+
+double Setpoint, Input, Output;
+
+double aggKp=4, aggKi=0.2, aggKd=1;
+double consKp=1, consKi=0.05, consKd=0.25;
+
+PID PID(&Input, &Output, &Setpoint, consKp, consKi, consKd, DIRECT);
 
 void setup_wifi()
 {
@@ -91,6 +99,11 @@ void reconnect()
 void setup()
 {
     Serial.begin(115200);
+
+    setup_wifi();
+    client.setServer(mqtt_server, 1883);
+    client.setCallback(callback);
+
     ArduinoOTA.begin();
 
     stepper.setMaxSpeed(200000);
@@ -98,9 +111,7 @@ void setup()
     stepper.setEnablePin(EPIN);
     stepper.disableOutputs();
 
-    setup_wifi();
-    client.setServer(mqtt_server, 1883);
-    client.setCallback(callback);
+    PID.SetMode(AUTOMATIC);
 }
 
 void loop()
@@ -114,9 +125,39 @@ void loop()
     client.loop();
 
     unsigned long now = millis();
-    if (now - lastMsg > 60000)
+
+    if (now - aliveMsg > 60000) //Publish alive message to home assistant every minute
     {
         lastMsg = now;
         client.publish("home-assistant/smart_table/availability", "online");
     }
+
+    if (now - eventLoop > 50) //Event loop every 50 mills
+    {
+
+
+        //TODO: Read encoder int Input
+
+        double gap = abs(Setpoint-Input); //distance away from setpoint
+        if (gap < 10)
+        {  
+            //we're close to setpoint, use conservative tuning parameters
+            PID.SetTunings(consKp, consKi, consKd);
+        }
+        else
+        {
+            //we're far from setpoint, use aggressive tuning parameters
+            PID.SetTunings(aggKp, aggKi, aggKd);
+        }
+
+        PID.Compute();
+
+        //TODO: Access Output for result
+    }
+    
+
+
+
+
+
 }
