@@ -4,6 +4,7 @@
 #include <ArduinoOTA.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <PID_v1.h>
 
 #include "keys.h"
 
@@ -13,6 +14,11 @@ const char *mqtt_server = MQTT_SERVER;
 #define DIRPIN 4
 #define EPIN 5
 #define ENCODERPIN 10
+
+//Positions
+#define RIGHT_SETPOINT 1000
+#define MID_SETPOINT 0 
+#define LEFT_SETPOINT -1000
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -61,10 +67,20 @@ void callback(char *topic, byte *payload, unsigned int length)
     Serial.print(topic);
     Serial.print("] ");
 
-    payload[length] = '\0';
-    String msg = String((char *)payload);
+    if(strcmp(topic, "set")) { 
+        char *state = (char *)payload;
+        if (strcmp(state, "right")) Setpoint = LEFT_SETPOINT;
+        if (strcmp(state, "mid")) Setpoint = MID_SETPOINT;
+        if (strcmp(state, "left")) Setpoint = RIGHT_SETPOINT;
+    }
 
-    Serial.print(msg);
+    if(strcmp(topic, "set_position")) { 
+        
+    }
+
+
+
+    //Serial.print(msg);
     Serial.println();
 
 }
@@ -133,26 +149,28 @@ void loop()
 
     if (now - aliveMsg > 60000) //Publish alive message to home assistant every minute
     {
-        lastMsg = now;
+        aliveMsg = now;
         client.publish("home-assistant/smart_table/availability", "online");
     }
 
-    if (now - eventLoop > 50) //Event loop every 50 mills
+    if (now - eventLoop > 100) //Event loop every 50 mills
     {
 
-        word val = angleSensor.getRawRotation();
-        Serial.print("Got rotation of: 0x");
-        Serial.println(val, HEX);
+        Input = encoder.getRotation();
+        Serial.print("Got rotation of:");
+        Serial.println(Input);
         Serial.print("State: ");
-        angleSensor.printState();
+        encoder.printState();
         Serial.print("Errors: ");
-        Serial.println(angleSensor.getErrors());
+        Serial.println(encoder.getErrors());
 
+        Serial.print("Setpoint:");
+        Serial.println(Setpoint);
 
-        //TODO: Read encoder into Input
+        PID.Compute();
 
-        //PID.Compute();
+        Serial.print("Output:");
+        Serial.println(Output);
 
-        //TODO: Access Output for result
     }
 }
