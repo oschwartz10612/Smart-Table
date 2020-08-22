@@ -9,14 +9,16 @@
 
 const char *mqtt_server = MQTT_SERVER;
 
+#define STEPPIN 14
+#define DIRPIN 4
+#define EPIN 5
+#define ENCODERPIN 10
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 unsigned long aliveMsg = 0;
 unsigned long eventLoop = 0;
 
-#define STEPPIN 14
-#define DIRPIN 4
-#define EPIN 5
 
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
@@ -26,6 +28,8 @@ double aggKp=4, aggKi=0.2, aggKd=1;
 double consKp=1, consKi=0.05, consKd=0.25;
 
 PID PID(&Input, &Output, &Setpoint, consKp, consKi, consKd, DIRECT);
+
+AS5048A encoder(ENCODERPIN);
 
 void setup_wifi()
 {
@@ -112,6 +116,7 @@ void setup()
     stepper.disableOutputs();
 
     PID.SetMode(AUTOMATIC);
+    PID.SetTunings(consKp, consKi, consKd);
 }
 
 void loop()
@@ -135,29 +140,19 @@ void loop()
     if (now - eventLoop > 50) //Event loop every 50 mills
     {
 
+        word val = angleSensor.getRawRotation();
+        Serial.print("Got rotation of: 0x");
+        Serial.println(val, HEX);
+        Serial.print("State: ");
+        angleSensor.printState();
+        Serial.print("Errors: ");
+        Serial.println(angleSensor.getErrors());
 
-        //TODO: Read encoder int Input
 
-        double gap = abs(Setpoint-Input); //distance away from setpoint
-        if (gap < 10)
-        {  
-            //we're close to setpoint, use conservative tuning parameters
-            PID.SetTunings(consKp, consKi, consKd);
-        }
-        else
-        {
-            //we're far from setpoint, use aggressive tuning parameters
-            PID.SetTunings(aggKp, aggKi, aggKd);
-        }
+        //TODO: Read encoder into Input
 
-        PID.Compute();
+        //PID.Compute();
 
         //TODO: Access Output for result
     }
-    
-
-
-
-
-
 }
