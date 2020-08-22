@@ -17,7 +17,7 @@ const char *mqtt_server = MQTT_SERVER;
 
 //Positions
 #define RIGHT_SETPOINT 1000
-#define MID_SETPOINT 0 
+#define MID_SETPOINT 0
 #define LEFT_SETPOINT -1000
 
 WiFiClient espClient;
@@ -25,13 +25,12 @@ PubSubClient client(espClient);
 unsigned long aliveMsg = 0;
 unsigned long eventLoop = 0;
 
-
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
 double Setpoint, Input, Output;
 
-double aggKp=4, aggKi=0.2, aggKd=1;
-double consKp=1, consKi=0.05, consKd=0.25;
+double aggKp = 4, aggKi = 0.2, aggKd = 1;
+double consKp = 1, consKi = 0.05, consKd = 0.25;
 
 PID PID(&Input, &Output, &Setpoint, consKp, consKi, consKd, DIRECT);
 
@@ -61,28 +60,51 @@ void setup_wifi()
     Serial.println(WiFi.localIP());
 }
 
+long parse_long(byte *payload, unsigned int &length)
+{
+    char buffer[128];
+
+    memcpy(buffer, payload, length);
+    buffer[length] = '\0';
+
+    // Convert it to integer
+    char *end = nullptr;
+    long value = strtol(buffer, &end, 10);
+
+    // Check for conversion errors
+    if (end == buffer || errno == ERANGE)
+        ; // Conversion error occurred
+    else
+        return value;
+}
+
 void callback(char *topic, byte *payload, unsigned int length)
 {
     Serial.print("Message arrived [");
     Serial.print(topic);
     Serial.print("] ");
 
-    if(strcmp(topic, "set")) { 
-        char *state = (char *)payload;
-        if (strcmp(state, "right")) Setpoint = LEFT_SETPOINT;
-        if (strcmp(state, "mid")) Setpoint = MID_SETPOINT;
-        if (strcmp(state, "left")) Setpoint = RIGHT_SETPOINT;
+    if (strcmp(topic, "set"))
+    {
+        char *state = (char*)payload;
+
+        if (strcmp(state, "right"))
+            Setpoint = LEFT_SETPOINT;
+        if (strcmp(state, "mid"))
+            Setpoint = MID_SETPOINT;
+        if (strcmp(state, "left"))
+            Setpoint = RIGHT_SETPOINT;
     }
 
-    if(strcmp(topic, "set_position")) { 
-        
+    if (strcmp(topic, "set_position"))
+    {
+        long value = parse_long(payload, length);
+        Serial.print("Requested Position:");
+        Serial.println(value);
     }
-
-
 
     //Serial.print(msg);
     Serial.println();
-
 }
 
 void reconnect()
@@ -171,6 +193,5 @@ void loop()
 
         Serial.print("Output:");
         Serial.println(Output);
-
     }
 }
