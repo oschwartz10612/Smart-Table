@@ -1,9 +1,9 @@
 #ifndef as5048_h
 #define as5048_h
-#define LIBRARY_VERSION 1.0.1
 
 #include <SPI.h>
 
+//Thanks to ZoetropeLabs for this library. Check it out here: https://github.com/ZoetropeLabs/AS5048A-Arduino
 class AS5048A{
 
 	bool errorFlag;

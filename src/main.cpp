@@ -14,6 +14,10 @@ const char *mqtt_server = MQTT_SERVER;
 #define DIRPIN 4
 #define EPIN 5
 #define ENCODERPIN 10
+#define STEPPER_SPEED 1000;
+
+#define MAX_STEPS 1000
+#define MAX_ENCODER 8192
 
 //Positions
 #define RIGHT_SETPOINT 1000
@@ -73,7 +77,7 @@ long parse_long(byte *payload, unsigned int &length)
 
     // Check for conversion errors
     if (end == buffer || errno == ERANGE)
-        ; // Conversion error occurred
+        return 0; // Conversion error occurred
     else
         return value;
 }
@@ -177,8 +181,12 @@ void loop()
 
     if (now - eventLoop > 100) //Event loop every 50 mills
     {
+        aliveMsg = now;
 
-        Input = encoder.getRotation();
+        int16_t rawEncoder = encoder.getRotation(); //Constrain?
+
+        Input = map(rawEncoder, -MAX_ENCODER, MAX_ENCODER, -MAX_STEPS, MAX_STEPS);
+
         Serial.print("Got rotation of:");
         Serial.println(Input);
         Serial.print("State: ");
@@ -193,5 +201,16 @@ void loop()
 
         Serial.print("Output:");
         Serial.println(Output);
+
+        stepper.moveTo(Output);
+        stepper.setSpeed(STEPPER_SPEED);
+
+        if (stepper.distanceToGo() == 0) {
+            stepper.disableOutputs();
+        }
+
     }
+
+    stepper.runSpeedToPosition();
+
 }

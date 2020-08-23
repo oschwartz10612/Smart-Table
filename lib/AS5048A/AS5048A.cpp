@@ -2,6 +2,8 @@
 
 #include <AS5048A.h>
 
+//Thanks to ZoetropeLabs for this library. Check it out here: https://github.com/ZoetropeLabs/AS5048A-Arduino
+
 //#define AS5048A_DEBUG
 
 const int AS5048A_CLEAR_ERROR_FLAG              = 0x0001;
