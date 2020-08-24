@@ -14,7 +14,7 @@ const char *mqtt_server = MQTT_SERVER;
 #define DIRPIN 4
 #define EPIN 5
 #define ENCODERPIN 10
-#define STEPPER_SPEED 1000;
+#define STEPPER_SPEED 1000
 
 #define MAX_STEPS 1000
 #define MAX_ENCODER 8192
@@ -33,10 +33,9 @@ AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
 double Setpoint, Input, Output;
 
-double aggKp = 4, aggKi = 0.2, aggKd = 1;
-double consKp = 1, consKi = 0.05, consKd = 0.25;
+double Kp = 1, Ki = 0.05, Kd = 0.25;
 
-PID PID(&Input, &Output, &Setpoint, consKp, consKi, consKd, DIRECT);
+PID PID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 AS5048A encoder(ENCODERPIN);
 
@@ -158,7 +157,7 @@ void setup()
     stepper.disableOutputs();
 
     PID.SetMode(AUTOMATIC);
-    PID.SetTunings(consKp, consKi, consKd);
+    PID.SetTunings(Kp, Ki, Kd);
 }
 
 void loop()
@@ -179,11 +178,11 @@ void loop()
         client.publish("home-assistant/smart_table/availability", "online");
     }
 
-    if (now - eventLoop > 100) //Event loop every 50 mills
+    if (now - eventLoop > 100) //Event loop every 100 mills
     {
-        aliveMsg = now;
+        eventLoop = now;
 
-        int16_t rawEncoder = encoder.getRotation(); //Constrain?
+        int16_t rawEncoder = encoder.getRotation();
 
         Input = map(rawEncoder, -MAX_ENCODER, MAX_ENCODER, -MAX_STEPS, MAX_STEPS);
 
@@ -202,11 +201,13 @@ void loop()
         Serial.print("Output:");
         Serial.println(Output);
 
-        stepper.moveTo(Output);
-        stepper.setSpeed(STEPPER_SPEED);
+        //stepper.moveTo(Output);
+        //stepper.setSpeed(STEPPER_SPEED);
 
         if (stepper.distanceToGo() == 0) {
             stepper.disableOutputs();
+        } else {
+            stepper.enableOutputs();
         }
 
     }
