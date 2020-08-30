@@ -10,10 +10,10 @@
 
 const char *mqtt_server = MQTT_SERVER;
 
-#define STEPPIN 14
-#define DIRPIN 4
-#define EPIN 5
-#define ENCODERPIN 10
+#define STEPPIN 33
+#define DIRPIN 32
+#define EPIN 27
+#define ENCODERPIN 5 //IO5
 #define STEPPER_SPEED 1000
 
 #define MAX_STEPS 1000
@@ -37,7 +37,7 @@ double Kp = 1, Ki = 0.05, Kd = 0.25;
 
 PID PID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
-AS5048A encoder(ENCODERPIN);
+AS5048A encoder(ENCODERPIN, false);
 
 void setup_wifi()
 {
@@ -145,73 +145,75 @@ void setup()
 {
     Serial.begin(115200);
 
-    setup_wifi();
-    client.setServer(mqtt_server, 1883);
-    client.setCallback(callback);
+    //setup_wifi();
+    //client.setServer(mqtt_server, 1883);
+    //client.setCallback(callback);
 
-    ArduinoOTA.begin();
+    //ArduinoOTA.begin();
 
-    stepper.setMaxSpeed(200000);
-    stepper.setAcceleration(10000);
-    stepper.setEnablePin(EPIN);
-    stepper.disableOutputs();
+    // stepper.setMaxSpeed(200000);
+    // stepper.setAcceleration(10000);
+    //stepper.setEnablePin(EPIN);
 
-    PID.SetMode(AUTOMATIC);
-    PID.SetTunings(Kp, Ki, Kd);
+
+    //PID.SetMode(AUTOMATIC);
+    //PID.SetTunings(Kp, Ki, Kd);
+
+    encoder.begin();
 }
 
 void loop()
 {
-    ArduinoOTA.handle();
+    //ArduinoOTA.handle();
 
-    if (!client.connected())
-    {
-        reconnect();
-    }
-    client.loop();
+    // if (!client.connected())
+    // {
+    //     reconnect();
+    // }
+    // client.loop();
 
     unsigned long now = millis();
 
-    if (now - aliveMsg > 60000) //Publish alive message to home assistant every minute
-    {
-        aliveMsg = now;
-        client.publish("home-assistant/smart_table/availability", "online");
-    }
+    // if (now - aliveMsg > 60000) //Publish alive message to home assistant every minute
+    // {
+    //     aliveMsg = now;
+    //     client.publish("home-assistant/smart_table/availability", "online");
+    // }
 
-    if (now - eventLoop > 100) //Event loop every 100 mills
+    if (now - eventLoop > 500) //Event loop every 100 mills
     {
         eventLoop = now;
 
-        int16_t rawEncoder = encoder.getRotation();
+        //int16_t rawEncoder = encoder.getRotation();
 
-        Input = map(rawEncoder, -MAX_ENCODER, MAX_ENCODER, -MAX_STEPS, MAX_STEPS);
+        //Input = map(rawEncoder, -MAX_ENCODER, MAX_ENCODER, -MAX_STEPS, MAX_STEPS);
 
-        Serial.print("Got rotation of:");
-        Serial.println(Input);
+        uint16_t val = encoder.getRawRotation();
+        Serial.print("Got rotation of: 0x");
+        Serial.println(val, HEX);
         Serial.print("State: ");
         encoder.printState();
         Serial.print("Errors: ");
         Serial.println(encoder.getErrors());
 
-        Serial.print("Setpoint:");
-        Serial.println(Setpoint);
+        //Serial.print("Setpoint:");
+        //Serial.println(Setpoint);
 
-        PID.Compute();
+        //PID.Compute();
 
-        Serial.print("Output:");
-        Serial.println(Output);
+        //Serial.print("Output:");
+        //Serial.println(Output);
 
         //stepper.moveTo(Output);
         //stepper.setSpeed(STEPPER_SPEED);
 
-        if (stepper.distanceToGo() == 0) {
-            stepper.disableOutputs();
-        } else {
-            stepper.enableOutputs();
-        }
+        // if (stepper.distanceToGo() == 0) {
+        //     stepper.disableOutputs();
+        // } else {
+        //     stepper.enableOutputs();
+        // }
 
     }
 
-    stepper.runSpeedToPosition();
-
+    //stepper.runSpeedToPosition();
 }
