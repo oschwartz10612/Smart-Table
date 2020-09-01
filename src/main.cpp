@@ -13,7 +13,6 @@ const char *mqtt_server = MQTT_SERVER;
 #define STEPPIN 33
 #define DIRPIN 32
 #define EPIN 27
-#define ENCODERPIN 5 //IO5
 #define STEPPER_SPEED 1000
 
 #define MAX_STEPS 1000
@@ -37,7 +36,12 @@ double Kp = 1, Ki = 0.05, Kd = 0.25;
 
 PID PID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
-AS5048A encoder(ENCODERPIN, false);
+  #define VSPI_MISO   19
+  #define VSPI_MOSI   23
+  #define VSPI_SCLK   18
+  #define VSPI_SS     5
+
+AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
 
 void setup_wifi()
 {
@@ -189,8 +193,8 @@ void loop()
         //Input = map(rawEncoder, -MAX_ENCODER, MAX_ENCODER, -MAX_STEPS, MAX_STEPS);
 
         uint16_t val = encoder.getRawRotation();
-        Serial.print("Got rotation of: 0x");
-        Serial.println(val, HEX);
+        Serial.print("Got rotation of");
+        Serial.println(val);
         Serial.print("State: ");
         encoder.printState();
         Serial.print("Errors: ");

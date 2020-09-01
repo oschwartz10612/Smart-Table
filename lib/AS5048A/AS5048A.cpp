@@ -23,13 +23,12 @@ static const uint16_t AS5048A_DIAG_OCF = 0x0400;
 static const double AS5048A_MAX_VALUE = 8191.0;
 
 SPIClass * vspi = NULL;
-#define VSPI_SS SS
 
 /**
  * Constructor
  */
-AS5048A::AS5048A(byte cs, bool debug /*=false*/)
-	: _cs(cs), errorFlag(false), ocfFlag(false), position(0), debug(debug)
+AS5048A::AS5048A(byte VSPI_SS, byte VSPI_MISO, byte VSPI_MOSI, byte VSPI_SCLK, bool debug /*=false*/)
+	: _VSPI_SS(VSPI_SS), _VSPI_MISO(VSPI_MISO), _VSPI_MOSI(VSPI_MOSI), _VSPI_SCLK(VSPI_SCLK), errorFlag(false), ocfFlag(false), position(0), debug(debug)
 {
 }
 
@@ -47,10 +46,10 @@ void AS5048A::begin()
 	vspi = new SPIClass(VSPI);
 
 	//setup pins
-	pinMode(VSPI_SS, OUTPUT);
+	pinMode(this->_VSPI_SS, OUTPUT);
 
 	//SPI has an internal SPI-device counter, it is possible to call "begin()" from different devices
-	vspi->begin();
+	vspi->begin(this->_VSPI_SCLK, this->_VSPI_MISO, this->_VSPI_MOSI, this->_VSPI_SS); //SCLK, MISO, MOSI, SS
 }
 
 /**
@@ -263,16 +262,16 @@ uint16_t AS5048A::read(uint16_t registerAddress)
 	vspi->beginTransaction(this->settings);
 
 	//Send the command
-	digitalWrite(VSPI_SS, LOW);
+	digitalWrite(this->_VSPI_SS, LOW);
 	vspi->transfer16(command);
-	digitalWrite(VSPI_SS, HIGH);
+	digitalWrite(this->_VSPI_SS, HIGH);
 
 	delay(this->esp32_delay);
 
 	//Now read the response
-	digitalWrite(VSPI_SS, LOW);
+	digitalWrite(this->_VSPI_SS, LOW);
 	uint16_t response = vspi->transfer16(0x00);
-	digitalWrite(VSPI_SS, HIGH);
+	digitalWrite(this->_VSPI_SS, HIGH);
 
 	//SPI - end transaction
 	vspi->endTransaction();
@@ -329,9 +328,9 @@ uint16_t AS5048A::write(uint16_t registerAddress, uint16_t data)
 	vspi->beginTransaction(this->settings);
 
 	//Start the write command with the target address
-	digitalWrite(VSPI_SS, LOW);
+	digitalWrite(this->_VSPI_SS, LOW);
 	vspi->transfer16(command);
-	digitalWrite(VSPI_SS, HIGH);
+	digitalWrite(this->_VSPI_SS, HIGH);
 
 	uint16_t dataToSend = 0x0000;
 	dataToSend |= data;
@@ -346,15 +345,15 @@ uint16_t AS5048A::write(uint16_t registerAddress, uint16_t data)
 	}
 
 	//Now send the data packet
-	digitalWrite(VSPI_SS, LOW);
+	digitalWrite(this->_VSPI_SS, LOW);
 	vspi->transfer16(dataToSend);
-	digitalWrite(VSPI_SS, HIGH);
+	digitalWrite(this->_VSPI_SS, HIGH);
 
 	delay(this->esp32_delay);
 
-	digitalWrite(VSPI_SS, LOW);
+	digitalWrite(this->_VSPI_SS, LOW);
 	uint16_t response = vspi->transfer16(0x0000);
-	digitalWrite(VSPI_SS, HIGH);
+	digitalWrite(this->_VSPI_SS, HIGH);
 
 	//SPI - end transaction
 	vspi->endTransaction();

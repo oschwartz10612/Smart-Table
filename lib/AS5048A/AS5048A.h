@@ -6,7 +6,11 @@
 class AS5048A
 {
 private:
-	uint8_t _cs;
+	uint8_t _VSPI_SS;
+	uint8_t _VSPI_MISO;
+	uint8_t _VSPI_MOSI;
+	uint8_t _VSPI_SCLK;
+
 	bool errorFlag;
 	bool ocfFlag; // Avoid printing OCF flag everytime
 	uint16_t position;
@@ -59,7 +63,7 @@ public:
 	/**
 	 *	Constructor
 	 */
-	AS5048A(uint8_t arg_cs, bool debug = false);
+	AS5048A(uint8_t VSPI_SS, uint8_t VSPI_MISO, uint8_t VSPI_MOSI, uint8_t VSPI_SCLK, bool debug = false);
 
 	/**
 	 * Initialiser
