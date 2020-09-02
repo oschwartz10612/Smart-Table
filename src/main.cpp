@@ -1,47 +1,60 @@
+//Settings
+//#define OTA 1
+#define DEBUG 1
+
 #include <Arduino.h>
 #include "AS5048A.h"
 #include <AccelStepper.h>
-#include <ArduinoOTA.h>
+#include <Preferences.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
-#include <PID_v1.h>
-
 #include "keys.h"
 
+#ifdef OTA
+#include <ArduinoOTA.h>
+#endif
+
 const char *mqtt_server = MQTT_SERVER;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
 
 #define STEPPIN 33
 #define DIRPIN 32
 #define EPIN 27
 #define STEPPER_SPEED 1000
 
-#define MAX_STEPS 1000
-#define MAX_ENCODER 8192
+#define MAX_STEPS 3000
+#define MAX_ENCODER 17000
 
 //Positions
 #define RIGHT_SETPOINT 1000
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -1000
 
-WiFiClient espClient;
-PubSubClient client(espClient);
-unsigned long aliveMsg = 0;
-unsigned long eventLoop = 0;
-
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
-double Setpoint, Input, Output;
-
-double Kp = 1, Ki = 0.05, Kd = 0.25;
-
-PID PID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
-
-  #define VSPI_MISO   19
-  #define VSPI_MOSI   23
-  #define VSPI_SCLK   18
-  #define VSPI_SS     5
+#define VSPI_MISO 19
+#define VSPI_MOSI 23
+#define VSPI_SCLK 18
+#define VSPI_SS 5
 
 AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
+
+uint16_t previousEncoder;
+uint8_t positionState; //2 = right, 1 = left, 0 = mid
+int16_t Setpoint;
+
+//Smoothing
+const int numReadings = 10;
+int readings[numReadings]; // the readings from the analog input
+int readIndex = 0;         // the index of the current reading
+int total = 0;             // the running total
+int average = 0;           // the average
+
+//Timing
+unsigned long aliveMsg = 0;
+unsigned long eventLoop = 0;
 
 void setup_wifi()
 {
@@ -93,7 +106,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
     if (strcmp(topic, "set"))
     {
-        char *state = (char*)payload;
+        char *state = (char *)payload;
 
         if (strcmp(state, "right"))
             Setpoint = LEFT_SETPOINT;
@@ -145,6 +158,30 @@ void reconnect()
     }
 }
 
+void smooth(uint16_t &inputVal)
+{
+    // subtract the last reading:
+    total = total - readings[readIndex];
+    // read from the sensor:
+    readings[readIndex] = inputVal;
+    // add the reading to the total:
+    total = total + readings[readIndex];
+    // advance to the next position in the array:
+    readIndex = readIndex + 1;
+
+    // if we're at the end of the array...
+    if (readIndex >= numReadings)
+    {
+        // ...wrap around to the beginning:
+        readIndex = 0;
+    }
+
+    // calculate the average:
+    average = total / numReadings;
+    // send it to the computer as ASCII digits
+    inputVal = average;
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -153,12 +190,13 @@ void setup()
     //client.setServer(mqtt_server, 1883);
     //client.setCallback(callback);
 
-    //ArduinoOTA.begin();
+#ifdef OTA
+    ArduinoOTA.begin();
+#endif
 
     // stepper.setMaxSpeed(200000);
     // stepper.setAcceleration(10000);
     //stepper.setEnablePin(EPIN);
-
 
     //PID.SetMode(AUTOMATIC);
     //PID.SetTunings(Kp, Ki, Kd);
@@ -184,29 +222,53 @@ void loop()
     //     client.publish("home-assistant/smart_table/availability", "online");
     // }
 
-    if (now - eventLoop > 500) //Event loop every 100 mills
+    if (Serial.available() > 0)
+    {
+        Setpoint = Serial.parseInt();
+    }
+
+    if (now - eventLoop > 50) //Event loop every 100 mills
     {
         eventLoop = now;
 
-        //int16_t rawEncoder = encoder.getRotation();
+        uint16_t rawEncoder = encoder.getRawRotation();
 
-        //Input = map(rawEncoder, -MAX_ENCODER, MAX_ENCODER, -MAX_STEPS, MAX_STEPS);
+#ifdef DEBUG
+        Serial.print(rawEncoder);
+        Serial.print(",   ");
+#endif
 
-        uint16_t val = encoder.getRawRotation();
-        Serial.print("Got rotation of");
-        Serial.println(val);
-        Serial.print("State: ");
-        encoder.printState();
-        Serial.print("Errors: ");
-        Serial.println(encoder.getErrors());
+        smooth(rawEncoder);
 
-        //Serial.print("Setpoint:");
-        //Serial.println(Setpoint);
+        int16_t velocity = rawEncoder - previousEncoder;
 
-        //PID.Compute();
+        previousEncoder = rawEncoder;
 
-        //Serial.print("Output:");
-        //Serial.println(Output);
+#ifdef DEBUG
+        Serial.print(rawEncoder);
+        Serial.print(",   ");
+        Serial.println(velocity);
+#endif
+
+        if (velocity >= 1000)
+        {
+#ifdef DEBUG
+            Serial.println("Change position right!");
+#endif
+        }
+        else if (velocity <= -1000)
+        {
+#ifdef DEBUG
+            Serial.println("Change position left!");
+#endif
+        }
+        else
+        {
+
+            //TODO: moveback to setpoint
+        }
+
+        //TODO: if no movement for some time turn off motor
 
         //stepper.moveTo(Output);
         //stepper.setSpeed(STEPPER_SPEED);
@@ -216,7 +278,6 @@ void loop()
         // } else {
         //     stepper.enableOutputs();
         // }
-
     }
 
     //stepper.runSpeedToPosition();

@@ -22,7 +22,7 @@ static const uint16_t AS5048A_DIAG_OCF = 0x0400;
 
 static const double AS5048A_MAX_VALUE = 8191.0;
 
-SPIClass * vspi = NULL;
+SPIClass *vspi = NULL;
 
 /**
  * Constructor
