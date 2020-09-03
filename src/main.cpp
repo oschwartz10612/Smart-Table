@@ -205,6 +205,9 @@ void setup()
     //PID.SetTunings(Kp, Ki, Kd);
 
     encoder.begin();
+    delay(500);
+    uint16_t rawEncoder = encoder.getRawRotation();
+    encoder.setZeroPosition(rawEncoder);
 }
 
 void loop()
@@ -235,7 +238,7 @@ void loop()
         eventLoop = now;
 
         uint16_t rawEncoder = encoder.getRawRotation();
-        uint16_t encoderSmoothed = smooth(rawEncoder);
+        //uint16_t encoderSmoothed = smooth(rawEncoder);
 
         int16_t encoderVelocity = rawEncoder - previousEncoder;
 
@@ -249,7 +252,7 @@ void loop()
         previousEncoder = rawEncoder;
 
 #ifdef DEBUG
-        Serial.print(encoderSmoothed);
+        Serial.print(rawEncoder);
         Serial.print(",   ");
         Serial.print(encoderVelocity);
         Serial.print(",   ");
