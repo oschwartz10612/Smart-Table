@@ -25,7 +25,8 @@ PubSubClient client(espClient);
 #define STEPPER_SPEED 1000
 
 #define MAX_STEPS 3000
-#define MAX_ENCODER 17000
+#define MAX_ENCODER 16384
+#define STEPS_PER_REV 200
 
 //Positions
 #define RIGHT_SETPOINT 1000
@@ -42,6 +43,8 @@ AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
 
 uint16_t previousEncoder;
+uint8_t previousStepperPos;
+int16_t absStepperPos;
 uint8_t positionState; //2 = right, 1 = left, 0 = mid
 int16_t Setpoint;
 
@@ -158,7 +161,7 @@ void reconnect()
     }
 }
 
-void smooth(uint16_t &inputVal)
+int smooth(uint16_t &inputVal)
 {
     // subtract the last reading:
     total = total - readings[readIndex];
@@ -179,7 +182,7 @@ void smooth(uint16_t &inputVal)
     // calculate the average:
     average = total / numReadings;
     // send it to the computer as ASCII digits
-    inputVal = average;
+    return average;
 }
 
 void setup()
@@ -232,31 +235,36 @@ void loop()
         eventLoop = now;
 
         uint16_t rawEncoder = encoder.getRawRotation();
+        uint16_t encoderSmoothed = smooth(rawEncoder);
 
-#ifdef DEBUG
-        Serial.print(rawEncoder);
-        Serial.print(",   ");
-#endif
+        int16_t encoderVelocity = rawEncoder - previousEncoder;
 
-        smooth(rawEncoder);
+        uint8_t stepperPos = map(rawEncoder, 0, MAX_ENCODER, 0, STEPS_PER_REV);
 
-        int16_t velocity = rawEncoder - previousEncoder;
+        int8_t stepperVelocity = stepperPos-previousStepperPos;
 
+        absStepperPos += stepperVelocity;
+
+        previousStepperPos = stepperPos;
         previousEncoder = rawEncoder;
 
 #ifdef DEBUG
-        Serial.print(rawEncoder);
+        Serial.print(encoderSmoothed);
         Serial.print(",   ");
-        Serial.println(velocity);
+        Serial.print(encoderVelocity);
+        Serial.print(",   ");
+        Serial.print(stepperVelocity);
+        Serial.print(",   ");
+        Serial.println(absStepperPos);
 #endif
 
-        if (velocity >= 1000)
+        if (encoderVelocity >= 1000)
         {
 #ifdef DEBUG
             Serial.println("Change position right!");
 #endif
         }
-        else if (velocity <= -1000)
+        else if (encoderVelocity <= -1000)
         {
 #ifdef DEBUG
             Serial.println("Change position left!");
