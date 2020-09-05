@@ -8,6 +8,7 @@
 #include <Preferences.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <PID_v1.h>
 #include "keys.h"
 
 #ifdef OTA
@@ -22,7 +23,7 @@ PubSubClient client(espClient);
 #define STEPPIN 33
 #define DIRPIN 32
 #define EPIN 27
-#define STEPPER_SPEED 1000
+#define STEPPER_SPEED 400
 
 #define MAX_STEPS 3000
 #define MAX_ENCODER 16384
@@ -46,7 +47,11 @@ uint16_t previousEncoder;
 uint8_t previousStepperPos;
 int16_t absStepperPos;
 uint8_t positionState; //2 = right, 1 = left, 0 = mid
-int16_t Setpoint;
+
+double Setpoint, Input, Output;
+
+
+PID PID(&Input, &Output, &Setpoint,2,5,1, DIRECT);
 
 //Smoothing
 const int numReadings = 10;
@@ -107,27 +112,26 @@ void callback(char *topic, byte *payload, unsigned int length)
     Serial.print(topic);
     Serial.print("] ");
 
+    char *msg = (char *)payload;
+    Serial.println(msg);
+
     if (strcmp(topic, "set"))
     {
-        char *state = (char *)payload;
 
-        if (strcmp(state, "right"))
+        if (strcmp(msg, "right"))
             Setpoint = LEFT_SETPOINT;
-        if (strcmp(state, "mid"))
+        if (strcmp(msg, "mid"))
             Setpoint = MID_SETPOINT;
-        if (strcmp(state, "left"))
+        if (strcmp(msg, "left"))
             Setpoint = RIGHT_SETPOINT;
-    }
-
-    if (strcmp(topic, "set_position"))
+    } 
+    else if (strcmp(topic, "set_position"))
     {
         long value = parse_long(payload, length);
+        Setpoint = value;
         Serial.print("Requested Position:");
         Serial.println(value);
     }
-
-    //Serial.print(msg);
-    Serial.println();
 }
 
 void reconnect()
@@ -197,17 +201,17 @@ void setup()
     ArduinoOTA.begin();
 #endif
 
-    // stepper.setMaxSpeed(200000);
-    // stepper.setAcceleration(10000);
-    //stepper.setEnablePin(EPIN);
-
-    //PID.SetMode(AUTOMATIC);
-    //PID.SetTunings(Kp, Ki, Kd);
+    stepper.setMaxSpeed(200000);
+    stepper.setAcceleration(1000);
+    stepper.setEnablePin(EPIN);
+    stepper.disableOutputs();
 
     encoder.begin();
     delay(500);
     uint16_t rawEncoder = encoder.getRawRotation();
     encoder.setZeroPosition(rawEncoder);
+
+    PID.SetMode(AUTOMATIC);
 }
 
 void loop()
@@ -233,7 +237,7 @@ void loop()
         Setpoint = Serial.parseInt();
     }
 
-    if (now - eventLoop > 50) //Event loop every 100 mills
+    if (now - eventLoop > 50) 
     {
         eventLoop = now;
 
@@ -251,15 +255,7 @@ void loop()
         previousStepperPos = stepperPos;
         previousEncoder = rawEncoder;
 
-#ifdef DEBUG
-        Serial.print(rawEncoder);
-        Serial.print(",   ");
-        Serial.print(encoderVelocity);
-        Serial.print(",   ");
-        Serial.print(stepperVelocity);
-        Serial.print(",   ");
-        Serial.println(absStepperPos);
-#endif
+
 
         if (encoderVelocity >= 1000)
         {
@@ -279,17 +275,31 @@ void loop()
             //TODO: moveback to setpoint
         }
 
+        PID.Compute();
+
         //TODO: if no movement for some time turn off motor
 
-        //stepper.moveTo(Output);
-        //stepper.setSpeed(STEPPER_SPEED);
+        //stepper.moveTo(setpoint);
+        stepper.setSpeed(Output);
 
-        // if (stepper.distanceToGo() == 0) {
-        //     stepper.disableOutputs();
-        // } else {
-        //     stepper.enableOutputs();
-        // }
+        if (stepper.distanceToGo() == 0) {
+            stepper.disableOutputs();
+        } else {
+            stepper.enableOutputs();
+        }
+
+#ifdef DEBUG
+        Serial.print(rawEncoder);
+        Serial.print(",   ");
+        Serial.print(encoderVelocity);
+        Serial.print(",   ");
+        Serial.print(stepperVelocity);
+        Serial.print(",   ");
+        Serial.print(absStepperPos);
+        Serial.print(",   ");
+        Serial.println(Output);
+#endif
     }
 
-    //stepper.runSpeedToPosition();
+    stepper.runSpeed();
 }
