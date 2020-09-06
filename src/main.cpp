@@ -44,17 +44,18 @@ AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
 
 uint16_t previousEncoder;
-uint8_t previousStepperPos;
-int16_t absStepperPos;
+int32_t absStepperPos;
 uint8_t positionState; //2 = right, 1 = left, 0 = mid
 
 double Setpoint, Input, Output;
+double Pk = .5;
+double Ik = 0;
+double Dk = 0;
 
-
-PID PID(&Input, &Output, &Setpoint,2,5,1, DIRECT);
+PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
 
 //Smoothing
-const int numReadings = 10;
+const int numReadings = 5;
 int readings[numReadings]; // the readings from the analog input
 int readIndex = 0;         // the index of the current reading
 int total = 0;             // the running total
@@ -124,7 +125,7 @@ void callback(char *topic, byte *payload, unsigned int length)
             Setpoint = MID_SETPOINT;
         if (strcmp(msg, "left"))
             Setpoint = RIGHT_SETPOINT;
-    } 
+    }
     else if (strcmp(topic, "set_position"))
     {
         long value = parse_long(payload, length);
@@ -165,7 +166,7 @@ void reconnect()
     }
 }
 
-int smooth(uint16_t &inputVal)
+void smooth(int32_t &inputVal)
 {
     // subtract the last reading:
     total = total - readings[readIndex];
@@ -186,7 +187,7 @@ int smooth(uint16_t &inputVal)
     // calculate the average:
     average = total / numReadings;
     // send it to the computer as ASCII digits
-    return average;
+    inputVal = average;
 }
 
 void setup()
@@ -207,16 +208,16 @@ void setup()
     stepper.disableOutputs();
 
     encoder.begin();
-    delay(500);
-    uint16_t rawEncoder = encoder.getRawRotation();
-    encoder.setZeroPosition(rawEncoder);
 
     PID.SetMode(AUTOMATIC);
+    PID.SetOutputLimits(-1000, 1000);
 }
 
 void loop()
 {
-    //ArduinoOTA.handle();
+#ifdef OTA
+    ArduinoOTA.handle();
+#endif
 
     // if (!client.connected())
     // {
@@ -237,25 +238,26 @@ void loop()
         Setpoint = Serial.parseInt();
     }
 
-    if (now - eventLoop > 50) 
+    if (now - eventLoop > 50)
     {
         eventLoop = now;
 
         uint16_t rawEncoder = encoder.getRawRotation();
-        //uint16_t encoderSmoothed = smooth(rawEncoder);
 
         int16_t encoderVelocity = rawEncoder - previousEncoder;
+        if (encoderVelocity > (MAX_ENCODER / 2))
+        {
+            Serial.println("wrap");
+            encoderVelocity = (rawEncoder - MAX_ENCODER) - previousEncoder;
+        } else if (encoderVelocity < -(MAX_ENCODER / 2))
+        {
+            Serial.println("wrap");
+            encoderVelocity = (rawEncoder + MAX_ENCODER) - previousEncoder;
+        }
 
-        uint8_t stepperPos = map(rawEncoder, 0, MAX_ENCODER, 0, STEPS_PER_REV);
+        absStepperPos += encoderVelocity;
 
-        int8_t stepperVelocity = stepperPos-previousStepperPos;
-
-        absStepperPos += stepperVelocity;
-
-        previousStepperPos = stepperPos;
         previousEncoder = rawEncoder;
-
-
 
         if (encoderVelocity >= 1000)
         {
@@ -275,16 +277,22 @@ void loop()
             //TODO: moveback to setpoint
         }
 
+        smooth(absStepperPos);
+
+        Input = absStepperPos;
+
         PID.Compute();
 
         //TODO: if no movement for some time turn off motor
 
-        //stepper.moveTo(setpoint);
         stepper.setSpeed(Output);
 
-        if (stepper.distanceToGo() == 0) {
+        if (Output < 3 && Output > -3)
+        {
             stepper.disableOutputs();
-        } else {
+        }
+        else
+        {
             stepper.enableOutputs();
         }
 
@@ -293,9 +301,9 @@ void loop()
         Serial.print(",   ");
         Serial.print(encoderVelocity);
         Serial.print(",   ");
-        Serial.print(stepperVelocity);
-        Serial.print(",   ");
         Serial.print(absStepperPos);
+        Serial.print(",   ");
+        Serial.print(Setpoint);
         Serial.print(",   ");
         Serial.println(Output);
 #endif
