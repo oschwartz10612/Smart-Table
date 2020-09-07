@@ -266,7 +266,7 @@ uint16_t AS5048A::read(uint16_t registerAddress)
 	vspi->transfer16(command);
 	digitalWrite(this->_VSPI_SS, HIGH);
 
-	delay(this->esp32_delay);
+	vTaskDelay(this->esp32_delay);
 
 	//Now read the response
 	digitalWrite(this->_VSPI_SS, LOW);
@@ -349,7 +349,7 @@ uint16_t AS5048A::write(uint16_t registerAddress, uint16_t data)
 	vspi->transfer16(dataToSend);
 	digitalWrite(this->_VSPI_SS, HIGH);
 
-	delay(this->esp32_delay);
+	vTaskDelay(this->esp32_delay);
 
 	digitalWrite(this->_VSPI_SS, LOW);
 	uint16_t response = vspi->transfer16(0x0000);

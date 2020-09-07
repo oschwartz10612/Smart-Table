@@ -30,9 +30,9 @@ PubSubClient client(espClient);
 #define STEPS_PER_REV 200
 
 //Positions
-#define RIGHT_SETPOINT 1000
+#define RIGHT_SETPOINT 10000
 #define MID_SETPOINT 0
-#define LEFT_SETPOINT -1000
+#define LEFT_SETPOINT -10000
 
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
@@ -45,25 +45,28 @@ AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
 
 uint16_t previousEncoder;
 int32_t absStepperPos;
+int32_t absStepperPosStable;
 uint8_t positionState; //2 = right, 1 = left, 0 = mid
+bool targetReached = false;
+double previousSetpoint;
 
-double Setpoint, Input, Output;
-double Pk = .5;
+double Setpoint = MID_SETPOINT;
+double Input, Output;
+double Pk = .2;
 double Ik = 0;
 double Dk = 0;
 
 PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
 
 //Smoothing
-const int numReadings = 5;
+const int numReadings = 10;
 int readings[numReadings]; // the readings from the analog input
 int readIndex = 0;         // the index of the current reading
 int total = 0;             // the running total
 int average = 0;           // the average
 
 //Timing
-unsigned long aliveMsg = 0;
-unsigned long eventLoop = 0;
+uint16_t encoderDelay = 50;
 
 void setup_wifi()
 {
@@ -190,6 +193,123 @@ void smooth(int32_t &inputVal)
     inputVal = average;
 }
 
+void runStepper(void *parameter)
+{
+    while (true)
+    {
+        if (Serial.available() > 0)
+        {
+            Setpoint = Serial.parseInt();
+        }
+        stepper.runSpeed();
+        vTaskDelay(1);
+    }
+}
+
+void readEncoder(void *parameter)
+{
+    while (true)
+    {
+        vTaskDelay(encoderDelay);
+        uint16_t rawEncoder = encoder.getRawRotation();
+
+        int16_t encoderVelocity = rawEncoder - previousEncoder;
+        if (encoderVelocity > (MAX_ENCODER / 2))
+        {
+            encoderVelocity = (rawEncoder - MAX_ENCODER) - previousEncoder;
+        }
+        else if (encoderVelocity < -(MAX_ENCODER / 2))
+        {
+            encoderVelocity = (rawEncoder + MAX_ENCODER) - previousEncoder;
+        }
+
+        absStepperPos += encoderVelocity;
+
+        previousEncoder = rawEncoder;
+
+        if (encoderVelocity >= 1000)
+        {
+#ifdef DEBUG
+            Serial.println("Change position right!");
+#endif
+            Setpoint = RIGHT_SETPOINT;
+        }
+        else if (encoderVelocity <= -1000)
+        {
+#ifdef DEBUG
+            Serial.println("Change position left!");
+#endif
+            Setpoint = LEFT_SETPOINT;
+        }
+
+        smooth(absStepperPos);
+
+        Input = absStepperPos;
+
+        PID.Compute();
+
+        stepper.setSpeed(Output);
+
+        if (Setpoint != previousSetpoint && targetReached)
+        {
+            targetReached = false;
+            absStepperPos = absStepperPosStable;
+        }
+
+        if (Output < 10 && Output > -10)
+        {
+            if (!targetReached)
+            {
+                stepper.disableOutputs();
+                absStepperPosStable = absStepperPos;
+                previousSetpoint = Setpoint;
+                encoderDelay = 800;
+                targetReached = true;
+            }
+        }
+        else if(!targetReached)
+        {
+            encoderDelay = 50;
+            stepper.enableOutputs();
+        }
+
+#ifdef DEBUG
+
+        Serial.print(absStepperPos);
+        Serial.print(",   ");
+        Serial.print(absStepperPosStable);
+        Serial.print(",   ");
+        Serial.println(Setpoint);
+#endif
+    }
+}
+
+void network(void *parameter)
+{
+    while (true)
+    {
+        if (!client.connected())
+        {
+            reconnect();
+        }
+        client.loop();
+
+#ifdef OTA
+        ArduinoOTA.handle();
+#endif
+        vTaskDelay(50);
+    }
+}
+
+void keepAlive()
+{
+    while (true) //Publish alive message to home assistant every minute
+    {
+        client.publish("home-assistant/smart_table/availability", "online");
+        vTaskDelay(60000);
+    }
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -211,103 +331,48 @@ void setup()
 
     PID.SetMode(AUTOMATIC);
     PID.SetOutputLimits(-1000, 1000);
+
+    xTaskCreatePinnedToCore(
+        runStepper,             // Function that should be called
+        "Run Stepper at Speed", // Name of the task (for debugging)
+        1000,                   // Stack size (bytes)
+        NULL,                   // Parameter to pass
+        1,                      // Task priority
+        NULL,                   // Task handle
+        0                       // Core you want to run the task on (0 or 1)
+    );
+
+    // xTaskCreatePinnedToCore(
+    //     keepAlive,                  // Function that should be called
+    //     "Maintain wifi and MQTT", // Name of the task (for debugging)
+    //     1000,                     // Stack size (bytes)
+    //     NULL,                     // Parameter to pass
+    //     2,                        // Task priority
+    //     NULL,                     // Task handle
+    //     0                         // Core you want to run the task on (0 or 1)
+    // );
+
+    xTaskCreatePinnedToCore(
+        readEncoder,                 // Function that should be called
+        "Read encoder and calc PID", // Name of the task (for debugging)
+        1000,                        // Stack size (bytes)
+        NULL,                        // Parameter to pass
+        1,                           // Task priority
+        NULL,                        // Task handle
+        1                            // Core you want to run the task on (0 or 1)
+    );
+
+    // xTaskCreatePinnedToCore(
+    //     network,                  // Function that should be called
+    //     "Maintain wifi and MQTT", // Name of the task (for debugging)
+    //     1000,                     // Stack size (bytes)
+    //     NULL,                     // Parameter to pass
+    //     2,                        // Task priority
+    //     NULL,                     // Task handle
+    //     1                         // Core you want to run the task on (0 or 1)
+    // );
 }
 
 void loop()
 {
-#ifdef OTA
-    ArduinoOTA.handle();
-#endif
-
-    // if (!client.connected())
-    // {
-    //     reconnect();
-    // }
-    // client.loop();
-
-    unsigned long now = millis();
-
-    // if (now - aliveMsg > 60000) //Publish alive message to home assistant every minute
-    // {
-    //     aliveMsg = now;
-    //     client.publish("home-assistant/smart_table/availability", "online");
-    // }
-
-    if (Serial.available() > 0)
-    {
-        Setpoint = Serial.parseInt();
-    }
-
-    if (now - eventLoop > 50)
-    {
-        eventLoop = now;
-
-        uint16_t rawEncoder = encoder.getRawRotation();
-
-        int16_t encoderVelocity = rawEncoder - previousEncoder;
-        if (encoderVelocity > (MAX_ENCODER / 2))
-        {
-            Serial.println("wrap");
-            encoderVelocity = (rawEncoder - MAX_ENCODER) - previousEncoder;
-        } else if (encoderVelocity < -(MAX_ENCODER / 2))
-        {
-            Serial.println("wrap");
-            encoderVelocity = (rawEncoder + MAX_ENCODER) - previousEncoder;
-        }
-
-        absStepperPos += encoderVelocity;
-
-        previousEncoder = rawEncoder;
-
-        if (encoderVelocity >= 1000)
-        {
-#ifdef DEBUG
-            Serial.println("Change position right!");
-#endif
-        }
-        else if (encoderVelocity <= -1000)
-        {
-#ifdef DEBUG
-            Serial.println("Change position left!");
-#endif
-        }
-        else
-        {
-
-            //TODO: moveback to setpoint
-        }
-
-        smooth(absStepperPos);
-
-        Input = absStepperPos;
-
-        PID.Compute();
-
-        //TODO: if no movement for some time turn off motor
-
-        stepper.setSpeed(Output);
-
-        if (Output < 3 && Output > -3)
-        {
-            stepper.disableOutputs();
-        }
-        else
-        {
-            stepper.enableOutputs();
-        }
-
-#ifdef DEBUG
-        Serial.print(rawEncoder);
-        Serial.print(",   ");
-        Serial.print(encoderVelocity);
-        Serial.print(",   ");
-        Serial.print(absStepperPos);
-        Serial.print(",   ");
-        Serial.print(Setpoint);
-        Serial.print(",   ");
-        Serial.println(Output);
-#endif
-    }
-
-    stepper.runSpeed();
 }
