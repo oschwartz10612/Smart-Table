@@ -1,3 +1,4 @@
 .pio
 include/keys.h
 .vscode
+.DS_Store

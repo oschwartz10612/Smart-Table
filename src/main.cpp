@@ -1,7 +1,7 @@
 //Settings
 //#define OTA 1
 #define DEBUG 1
-#define NETWORK 1
+//#define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -31,9 +31,9 @@ PubSubClient client(espClient);
 #define STEPS_PER_REV 200
 
 //Positions
-#define RIGHT_SETPOINT 10000
+#define RIGHT_SETPOINT 1000
 #define MID_SETPOINT 0
-#define LEFT_SETPOINT -10000
+#define LEFT_SETPOINT -1000
 
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
@@ -47,7 +47,7 @@ AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
 uint16_t previousEncoder;
 int32_t absStepperPos;
 int32_t absStepperPosStable;
-uint8_t positionState; //2 = right, 1 = left, 0 = mid
+uint8_t positionState = 0; //2 = right, 1 = left, 0 = mid
 bool targetReached = false;
 double previousSetpoint;
 
@@ -55,7 +55,7 @@ bool updating = false;
 
 double Setpoint = MID_SETPOINT;
 double Input, Output;
-double Pk = .2;
+double Pk = .8;
 double Ik = 0;
 double Dk = 0;
 
@@ -70,7 +70,6 @@ int average = 0;           // the average
 
 //Timing
 uint16_t encoderDelay = 50;
-
 
 void setup_wifi()
 {
@@ -135,7 +134,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     Serial.println(msg);
 #endif
 
-    if (strcmp(topic,"home-assistant/smart_table/set")==0)
+    if (strcmp(topic, "home-assistant/smart_table/set") == 0)
     {
 
 #ifdef DEBUG
@@ -222,10 +221,12 @@ void runStepper(void *parameter)
 {
     while (true)
     {
+#ifdef DEBUG
         if (Serial.available() > 0)
         {
             Setpoint = Serial.parseInt();
         }
+#endif
         if (!targetReached)
         {
             stepper.runSpeed();
@@ -239,7 +240,22 @@ void readEncoder(void *parameter)
     while (true)
     {
         vTaskDelay(encoderDelay);
+
         uint16_t rawEncoder = encoder.getRawRotation();
+
+        if (Setpoint == 1234)
+        {
+// ZERO out the encoder
+#ifdef DEBUG
+            Serial.println("Zero out");
+#endif
+
+            encoder.setZeroPosition(rawEncoder);
+            absStepperPos = 0;
+            Setpoint = 0;
+            rawEncoder = 0;
+            previousEncoder = 0;
+        }
 
         int16_t encoderVelocity = rawEncoder - previousEncoder;
         if (encoderVelocity > (MAX_ENCODER / 2))
@@ -260,16 +276,36 @@ void readEncoder(void *parameter)
 #ifdef DEBUG
             Serial.println("Change position right!");
 #endif
-            Setpoint = RIGHT_SETPOINT;
+
+            if (positionState == 0)
+            {
+                positionState = 2;
+                Setpoint = RIGHT_SETPOINT;
+            }
+            else
+            {
+                positionState = 0;
+                Setpoint = MID_SETPOINT;
+            }
         }
         else if (encoderVelocity <= -1000 && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position left!");
 #endif
-            Setpoint = LEFT_SETPOINT;
+
+            if (positionState == 0)
+            {
+                positionState = 1;
+                Setpoint = LEFT_SETPOINT;
+            }
+            else
+            {
+                positionState = 0;
+                Setpoint = MID_SETPOINT;
+            }
         }
-        else if (abs(encoderVelocity) >= 10 && targetReached)
+        else if (abs(encoderVelocity) >= 23 && targetReached)
         {
             targetReached = false;
         }
@@ -288,7 +324,7 @@ void readEncoder(void *parameter)
             absStepperPos = absStepperPosStable;
         }
 
-        if (Output < 8 && Output > -8)
+        if (Output < 10 && Output > -10)
         {
             if (!targetReached)
             {
@@ -358,6 +394,8 @@ void setup()
     PID.SetMode(AUTOMATIC);
     PID.SetOutputLimits(-1000, 1000);
 
+    previousEncoder = encoder.getRawRotation();
+
 #ifdef NETWORK
     setup_wifi();
     client.setServer(mqtt_server, 1883);
@@ -407,7 +445,6 @@ void setup()
         NULL,                        // Task handle
         1                            // Core you want to run the task on (0 or 1)
     );
-
 }
 
 void loop()
