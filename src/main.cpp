@@ -1,6 +1,7 @@
 //Settings
 //#define OTA 1
 #define DEBUG 1
+#define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -70,6 +71,7 @@ uint16_t encoderDelay = 50;
 
 void setup_wifi()
 {
+    stepper.disableOutputs();
     delay(10);
     // We start by connecting to a WiFi network
     Serial.println();
@@ -119,17 +121,17 @@ void callback(char *topic, byte *payload, unsigned int length)
     char *msg = (char *)payload;
     Serial.println(msg);
 
-    if (strcmp(topic, "set"))
+    if (strcmp(topic, "home-assistant/smart_table/set"))
     {
 
         if (strcmp(msg, "right"))
-            Setpoint = LEFT_SETPOINT;
+            Setpoint = RIGHT_SETPOINT;
         if (strcmp(msg, "mid"))
             Setpoint = MID_SETPOINT;
         if (strcmp(msg, "left"))
-            Setpoint = RIGHT_SETPOINT;
+            Setpoint = LEFT_SETPOINT;
     }
-    else if (strcmp(topic, "set_position"))
+    else if (strcmp(topic, "home-assistant/smart_table/set_position"))
     {
         long value = parse_long(payload, length);
         Setpoint = value;
@@ -144,7 +146,6 @@ void reconnect()
     while (!client.connected())
     {
         Serial.print("Attempting MQTT connection...");
-        stepper.disableOutputs();
         // Create a random client ID
         String clientId = "Smart_Table-";
         clientId += String(random(0xffff), HEX);
@@ -201,7 +202,10 @@ void runStepper(void *parameter)
         {
             Setpoint = Serial.parseInt();
         }
-        stepper.runSpeed();
+        if (!targetReached)
+        {
+            stepper.runSpeed();
+        }
         vTaskDelay(1);
     }
 }
@@ -241,6 +245,10 @@ void readEncoder(void *parameter)
 #endif
             Setpoint = LEFT_SETPOINT;
         }
+        else if (abs(encoderVelocity) >= 10)
+        {
+            targetReached = false;
+        }
 
         smooth(absStepperPos);
 
@@ -256,18 +264,18 @@ void readEncoder(void *parameter)
             absStepperPos = absStepperPosStable;
         }
 
-        if (Output < 10 && Output > -10)
+        if (Output < 8 && Output > -8)
         {
             if (!targetReached)
             {
                 stepper.disableOutputs();
                 absStepperPosStable = absStepperPos;
                 previousSetpoint = Setpoint;
-                encoderDelay = 800;
+                encoderDelay = 100;
                 targetReached = true;
             }
         }
-        else if(!targetReached)
+        else if (!targetReached)
         {
             encoderDelay = 50;
             stepper.enableOutputs();
@@ -301,7 +309,7 @@ void network(void *parameter)
     }
 }
 
-void keepAlive()
+void keepAlive(void *parameter)
 {
     while (true) //Publish alive message to home assistant every minute
     {
@@ -313,14 +321,6 @@ void keepAlive()
 void setup()
 {
     Serial.begin(115200);
-
-    //setup_wifi();
-    //client.setServer(mqtt_server, 1883);
-    //client.setCallback(callback);
-
-#ifdef OTA
-    ArduinoOTA.begin();
-#endif
 
     stepper.setMaxSpeed(200000);
     stepper.setAcceleration(1000);
@@ -342,16 +342,6 @@ void setup()
         0                       // Core you want to run the task on (0 or 1)
     );
 
-    // xTaskCreatePinnedToCore(
-    //     keepAlive,                  // Function that should be called
-    //     "Maintain wifi and MQTT", // Name of the task (for debugging)
-    //     1000,                     // Stack size (bytes)
-    //     NULL,                     // Parameter to pass
-    //     2,                        // Task priority
-    //     NULL,                     // Task handle
-    //     0                         // Core you want to run the task on (0 or 1)
-    // );
-
     xTaskCreatePinnedToCore(
         readEncoder,                 // Function that should be called
         "Read encoder and calc PID", // Name of the task (for debugging)
@@ -362,15 +352,35 @@ void setup()
         1                            // Core you want to run the task on (0 or 1)
     );
 
-    // xTaskCreatePinnedToCore(
-    //     network,                  // Function that should be called
-    //     "Maintain wifi and MQTT", // Name of the task (for debugging)
-    //     1000,                     // Stack size (bytes)
-    //     NULL,                     // Parameter to pass
-    //     2,                        // Task priority
-    //     NULL,                     // Task handle
-    //     1                         // Core you want to run the task on (0 or 1)
-    // );
+#ifdef NETWORK
+    setup_wifi();
+    client.setServer(mqtt_server, 1883);
+    client.setCallback(callback);
+
+    xTaskCreatePinnedToCore(
+        keepAlive,                // Function that should be called
+        "Maintain wifi and MQTT", // Name of the task (for debugging)
+        2000,                     // Stack size (bytes)
+        NULL,                     // Parameter to pass
+        2,                        // Task priority
+        NULL,                     // Task handle
+        0                         // Core you want to run the task on (0 or 1)
+    );
+
+    xTaskCreatePinnedToCore(
+        network,                  // Function that should be called
+        "Maintain wifi and MQTT", // Name of the task (for debugging)
+        2000,                     // Stack size (bytes)
+        NULL,                     // Parameter to pass
+        2,                        // Task priority
+        NULL,                     // Task handle
+        1                         // Core you want to run the task on (0 or 1)
+    );
+#endif
+
+#ifdef OTA
+    ArduinoOTA.begin();
+#endif
 }
 
 void loop()
