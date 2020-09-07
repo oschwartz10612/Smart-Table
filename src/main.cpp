@@ -51,6 +51,8 @@ uint8_t positionState; //2 = right, 1 = left, 0 = mid
 bool targetReached = false;
 double previousSetpoint;
 
+bool updating = false;
+
 double Setpoint = MID_SETPOINT;
 double Input, Output;
 double Pk = .2;
@@ -69,29 +71,35 @@ int average = 0;           // the average
 //Timing
 uint16_t encoderDelay = 50;
 
+
 void setup_wifi()
 {
     stepper.disableOutputs();
     delay(10);
-    // We start by connecting to a WiFi network
+// We start by connecting to a WiFi network
+#ifdef DEBUG
     Serial.println();
     Serial.print("Connecting to ");
     Serial.println(WIFI_NAME);
+#endif
 
     WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
 
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(500);
+#ifdef DEBUG
         Serial.print(".");
+#endif
     }
 
     randomSeed(micros());
-
+#ifdef DEBUG
     Serial.println("");
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
+#endif
 }
 
 long parse_long(byte *payload, unsigned int &length)
@@ -114,30 +122,40 @@ long parse_long(byte *payload, unsigned int &length)
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
+
+#ifdef DEBUG
     Serial.print("Message arrived [");
     Serial.print(topic);
     Serial.print("] ");
+#endif
 
-    char *msg = (char *)payload;
+    payload[length] = '\0';
+    String msg = String((char *)payload);
+#ifdef DEBUG
     Serial.println(msg);
+#endif
 
-    if (strcmp(topic, "home-assistant/smart_table/set"))
+    if (strcmp(topic,"home-assistant/smart_table/set")==0)
     {
 
-        if (strcmp(msg, "right"))
+#ifdef DEBUG
+        Serial.println("Changing position");
+#endif
+
+        if (msg == "right")
             Setpoint = RIGHT_SETPOINT;
-        if (strcmp(msg, "mid"))
+        if (msg == "mid")
             Setpoint = MID_SETPOINT;
-        if (strcmp(msg, "left"))
+        if (msg == "left")
             Setpoint = LEFT_SETPOINT;
     }
-    else if (strcmp(topic, "home-assistant/smart_table/set_position"))
-    {
-        long value = parse_long(payload, length);
-        Setpoint = value;
-        Serial.print("Requested Position:");
-        Serial.println(value);
-    }
+    // else if (strcmp(topic, "home-assistant/smart_table/set_position"))
+    // {
+    //     long value = parse_long(payload, length);
+    //     Setpoint = value;
+    //     Serial.print("Requested Position:");
+    //     Serial.println(value);
+    // }
 }
 
 void reconnect()
@@ -145,14 +163,18 @@ void reconnect()
     // Loop until we're reconnected
     while (!client.connected())
     {
+#ifdef DEBUG
         Serial.print("Attempting MQTT connection...");
+#endif
         // Create a random client ID
         String clientId = "Smart_Table-";
         clientId += String(random(0xffff), HEX);
         // Attempt to connect
         if (client.connect(clientId.c_str()))
         {
+#ifdef DEBUG
             Serial.println("connected");
+#endif
             // Once connected, publish an announcement...
             client.publish("home-assistant/smart_table/availability", "online");
             // ... and resubscribe
@@ -161,9 +183,11 @@ void reconnect()
         }
         else
         {
+#ifdef DEBUG
             Serial.print("failed, rc=");
             Serial.print(client.state());
             Serial.println(" try again in 5 seconds");
+#endif
             // Wait 5 seconds before retrying
             delay(5000);
         }
@@ -231,21 +255,21 @@ void readEncoder(void *parameter)
 
         previousEncoder = rawEncoder;
 
-        if (encoderVelocity >= 1000)
+        if (encoderVelocity >= 1000 && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position right!");
 #endif
             Setpoint = RIGHT_SETPOINT;
         }
-        else if (encoderVelocity <= -1000)
+        else if (encoderVelocity <= -1000 && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position left!");
 #endif
             Setpoint = LEFT_SETPOINT;
         }
-        else if (abs(encoderVelocity) >= 10)
+        else if (abs(encoderVelocity) >= 10 && targetReached)
         {
             targetReached = false;
         }
@@ -271,7 +295,7 @@ void readEncoder(void *parameter)
                 stepper.disableOutputs();
                 absStepperPosStable = absStepperPos;
                 previousSetpoint = Setpoint;
-                encoderDelay = 100;
+                encoderDelay = 300;
                 targetReached = true;
             }
         }
@@ -320,7 +344,9 @@ void keepAlive(void *parameter)
 
 void setup()
 {
+#ifdef DEBUG
     Serial.begin(115200);
+#endif
 
     stepper.setMaxSpeed(200000);
     stepper.setAcceleration(1000);
@@ -332,30 +358,14 @@ void setup()
     PID.SetMode(AUTOMATIC);
     PID.SetOutputLimits(-1000, 1000);
 
-    xTaskCreatePinnedToCore(
-        runStepper,             // Function that should be called
-        "Run Stepper at Speed", // Name of the task (for debugging)
-        1000,                   // Stack size (bytes)
-        NULL,                   // Parameter to pass
-        1,                      // Task priority
-        NULL,                   // Task handle
-        0                       // Core you want to run the task on (0 or 1)
-    );
-
-    xTaskCreatePinnedToCore(
-        readEncoder,                 // Function that should be called
-        "Read encoder and calc PID", // Name of the task (for debugging)
-        1000,                        // Stack size (bytes)
-        NULL,                        // Parameter to pass
-        1,                           // Task priority
-        NULL,                        // Task handle
-        1                            // Core you want to run the task on (0 or 1)
-    );
-
 #ifdef NETWORK
     setup_wifi();
     client.setServer(mqtt_server, 1883);
     client.setCallback(callback);
+
+#ifdef OTA
+    ArduinoOTA.begin();
+#endif
 
     xTaskCreatePinnedToCore(
         keepAlive,                // Function that should be called
@@ -378,9 +388,26 @@ void setup()
     );
 #endif
 
-#ifdef OTA
-    ArduinoOTA.begin();
-#endif
+    xTaskCreatePinnedToCore(
+        runStepper,             // Function that should be called
+        "Run Stepper at Speed", // Name of the task (for debugging)
+        1000,                   // Stack size (bytes)
+        NULL,                   // Parameter to pass
+        1,                      // Task priority
+        NULL,                   // Task handle
+        0                       // Core you want to run the task on (0 or 1)
+    );
+
+    xTaskCreatePinnedToCore(
+        readEncoder,                 // Function that should be called
+        "Read encoder and calc PID", // Name of the task (for debugging)
+        1000,                        // Stack size (bytes)
+        NULL,                        // Parameter to pass
+        1,                           // Task priority
+        NULL,                        // Task handle
+        1                            // Core you want to run the task on (0 or 1)
+    );
+
 }
 
 void loop()
