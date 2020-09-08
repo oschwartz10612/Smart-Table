@@ -24,16 +24,16 @@ PubSubClient client(espClient);
 #define STEPPIN 33
 #define DIRPIN 32
 #define EPIN 27
-#define STEPPER_SPEED 400
+#define STEPPER_SPEED 1500
 
 #define MAX_STEPS 3000
 #define MAX_ENCODER 16384
 #define STEPS_PER_REV 200
 
 //Positions
-#define RIGHT_SETPOINT 1000
+#define RIGHT_SETPOINT 8000
 #define MID_SETPOINT 0
-#define LEFT_SETPOINT -1000
+#define LEFT_SETPOINT -8000
 
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
@@ -55,7 +55,7 @@ bool updating = false;
 
 double Setpoint = MID_SETPOINT;
 double Input, Output;
-double Pk = .8;
+double Pk = 2;
 double Ik = 0;
 double Dk = 0;
 
@@ -271,7 +271,7 @@ void readEncoder(void *parameter)
 
         previousEncoder = rawEncoder;
 
-        if (encoderVelocity >= 1000 && targetReached)
+        if (encoderVelocity >= 1500 && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position right!");
@@ -288,7 +288,7 @@ void readEncoder(void *parameter)
                 Setpoint = MID_SETPOINT;
             }
         }
-        else if (encoderVelocity <= -1000 && targetReached)
+        else if (encoderVelocity <= -1500 && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position left!");
@@ -392,7 +392,7 @@ void setup()
     encoder.begin();
 
     PID.SetMode(AUTOMATIC);
-    PID.SetOutputLimits(-1000, 1000);
+    PID.SetOutputLimits(-STEPPER_SPEED, STEPPER_SPEED);
 
     previousEncoder = encoder.getRawRotation();
 
