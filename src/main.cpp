@@ -51,6 +51,9 @@ uint8_t positionState = 0; //2 = right, 1 = left, 0 = mid
 bool targetReached = false;
 double previousSetpoint;
 
+#define DISABLE_TIME 30000
+int32_t disableCounter = 0;
+
 bool updating = false;
 
 double Setpoint = MID_SETPOINT;
@@ -271,7 +274,7 @@ void readEncoder(void *parameter)
 
         previousEncoder = rawEncoder;
 
-        if (encoderVelocity >= 1500 && targetReached)
+        if (encoderVelocity >= 2000 && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position right!");
@@ -288,7 +291,7 @@ void readEncoder(void *parameter)
                 Setpoint = MID_SETPOINT;
             }
         }
-        else if (encoderVelocity <= -1500 && targetReached)
+        else if (encoderVelocity <= -2000 && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position left!");
@@ -328,16 +331,24 @@ void readEncoder(void *parameter)
         {
             if (!targetReached)
             {
-                stepper.disableOutputs();
                 absStepperPosStable = absStepperPos;
                 previousSetpoint = Setpoint;
                 encoderDelay = 300;
                 targetReached = true;
             }
+            if (disableCounter >= DISABLE_TIME)
+            {
+                stepper.disableOutputs();
+            }
+            else
+            {
+                disableCounter += encoderDelay;
+            }
         }
         else if (!targetReached)
         {
             encoderDelay = 50;
+            disableCounter = 0;
             stepper.enableOutputs();
         }
 
@@ -347,7 +358,9 @@ void readEncoder(void *parameter)
         Serial.print(",   ");
         Serial.print(absStepperPosStable);
         Serial.print(",   ");
-        Serial.println(Setpoint);
+        Serial.print(Setpoint);
+        Serial.print(",   ");
+        Serial.println(disableCounter);
 #endif
     }
 }
