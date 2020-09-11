@@ -16,6 +16,8 @@
 #include <ArduinoOTA.h>
 #endif
 
+Preferences preferences;
+
 const char *mqtt_server = MQTT_SERVER;
 
 WiFiClient espClient;
@@ -45,11 +47,12 @@ AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
 
 uint16_t previousEncoder;
-int32_t absStepperPos;
-int32_t absStepperPosStable;
+int32_t absStepperPos = 0;
+int32_t absStepperPosStable = 0;
 uint8_t positionState = 0; //2 = right, 1 = left, 0 = mid
 bool targetReached = false;
 double previousSetpoint;
+bool boot = true;
 
 #define DISABLE_TIME 30000
 int32_t disableCounter = 0;
@@ -331,19 +334,21 @@ void readEncoder(void *parameter)
         {
             if (!targetReached)
             {
+                stepper.disableOutputs();
                 absStepperPosStable = absStepperPos;
                 previousSetpoint = Setpoint;
-                encoderDelay = 300;
+                encoderDelay = 100;
                 targetReached = true;
+                preferences.putInt("absStepperPos", absStepperPos);
             }
-            if (disableCounter >= DISABLE_TIME)
-            {
-                stepper.disableOutputs();
-            }
-            else
-            {
-                disableCounter += encoderDelay;
-            }
+            // if (disableCounter >= DISABLE_TIME)
+            // {
+            //    encoderDelay = 500;
+            // }
+            // else
+            // {
+            //    disableCounter += encoderDelay;
+            // }
         }
         else if (!targetReached)
         {
@@ -358,9 +363,7 @@ void readEncoder(void *parameter)
         Serial.print(",   ");
         Serial.print(absStepperPosStable);
         Serial.print(",   ");
-        Serial.print(Setpoint);
-        Serial.print(",   ");
-        Serial.println(disableCounter);
+        Serial.println(Setpoint);
 #endif
     }
 }
@@ -407,6 +410,31 @@ void setup()
     PID.SetMode(AUTOMATIC);
     PID.SetOutputLimits(-STEPPER_SPEED, STEPPER_SPEED);
 
+    preferences.begin("table", false);
+
+    absStepperPos = preferences.getInt("absStepperPos", 0);
+    absStepperPosStable = absStepperPos;
+
+    for (uint16_t i = 0; i <= numReadings; i++)
+    {
+        smooth(absStepperPos);
+        absStepperPos = absStepperPosStable;
+    }
+    
+#ifdef DEBUG
+    Serial.print("Last stepper pos");
+    Serial.println(absStepperPos);
+#endif
+
+    if (absStepperPos >= (RIGHT_SETPOINT-100) )
+    {
+        positionState = 2;
+    } else if(absStepperPos <= (LEFT_SETPOINT+100)) {
+        positionState = 1;
+    } else {
+        positionState = 0;
+    }
+    
     previousEncoder = encoder.getRawRotation();
 
 #ifdef NETWORK
@@ -452,7 +480,7 @@ void setup()
     xTaskCreatePinnedToCore(
         readEncoder,                 // Function that should be called
         "Read encoder and calc PID", // Name of the task (for debugging)
-        1000,                        // Stack size (bytes)
+        2000,                        // Stack size (bytes)
         NULL,                        // Parameter to pass
         1,                           // Task priority
         NULL,                        // Task handle
