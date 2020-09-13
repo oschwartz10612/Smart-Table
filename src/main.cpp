@@ -1,6 +1,6 @@
 //Settings
-#define OTA 1
-//#define DEBUG 1
+//#define OTA 1
+#define DEBUG 1
 #define NETWORK 1
 
 #include <Arduino.h>
@@ -82,7 +82,7 @@ uint16_t encoderDelay = 50;
 void setup_wifi()
 {
     stepper.disableOutputs();
-    vTaskDelay(10);
+    delay(10);
 // We start by connecting to a WiFi network
 #ifdef DEBUG
     Serial.println();
@@ -94,7 +94,7 @@ void setup_wifi()
 
     while (WiFi.status() != WL_CONNECTED)
     {
-        vTaskDelay(500);
+        delay(500);
 #ifdef DEBUG
         Serial.print(".");
 #endif
@@ -221,8 +221,6 @@ void readEncoder(void *parameter)
 {
     while (true)
     {
-        vTaskDelay(encoderDelay);
-
         uint16_t rawEncoder = encoder.getRawRotation();
 
         int16_t encoderVelocity = rawEncoder - previousEncoder;
@@ -276,6 +274,7 @@ void readEncoder(void *parameter)
         else if (abs(encoderVelocity) >= START_THRESHOLD && targetReached)
         {
             targetReached = false;
+            absStepperPos = absStepperPosStable;
         }
 
         smooth(absStepperPos);
@@ -328,6 +327,8 @@ void readEncoder(void *parameter)
         Serial.print(",   ");
         Serial.println(Setpoint);
 #endif
+
+        vTaskDelay(encoderDelay);
     }
 }
 
