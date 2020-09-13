@@ -1,7 +1,7 @@
 //Settings
-//#define OTA 1
-#define DEBUG 1
-//#define NETWORK 1
+#define OTA 1
+//#define DEBUG 1
+#define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -53,7 +53,7 @@ AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
 uint16_t previousEncoder;
 int32_t absStepperPos = 0;
 int32_t absStepperPosStable = 0;
-uint8_t positionState = 0; //2 = right, 1 = left, 0 = mid
+byte positionState = 0; //2 = right, 1 = left, 0 = mid
 
 bool targetReached = false;
 double previousSetpoint;
@@ -70,11 +70,11 @@ double Dk = .3;
 PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
 
 //Smoothing
-const int numReadings = 10;
-int readings[numReadings]; // the readings from the analog input
-int readIndex = 0;         // the index of the current reading
-int total = 0;             // the running total
-int average = 0;           // the average
+const uint8_t numReadings = 10;
+int32_t readings[numReadings]; // the readings from the analog input
+int32_t readIndex = 0;         // the index of the current reading
+int32_t total = 0;             // the running total
+int32_t average = 0;           // the average
 
 //Timing
 uint16_t encoderDelay = 50;
@@ -109,24 +109,6 @@ void setup_wifi()
 #endif
 }
 
-long parse_long(byte *payload, unsigned int &length)
-{
-    char buffer[128];
-
-    memcpy(buffer, payload, length);
-    buffer[length] = '\0';
-
-    // Convert it to integer
-    char *end = nullptr;
-    long value = strtol(buffer, &end, 10);
-
-    // Check for conversion errors
-    if (end == buffer || errno == ERANGE)
-        return 0; // Conversion error occurred
-    else
-        return value;
-}
-
 void callback(char *topic, byte *payload, unsigned int length)
 {
 
@@ -156,13 +138,6 @@ void callback(char *topic, byte *payload, unsigned int length)
         if (msg == "left")
             Setpoint = LEFT_SETPOINT;
     }
-    // else if (strcmp(topic, "home-assistant/smart_table/set_position"))
-    // {
-    //     long value = parse_long(payload, length);
-    //     Setpoint = value;
-    //     Serial.print("Requested Position:");
-    //     Serial.println(value);
-    // }
 }
 
 void reconnect()
@@ -221,7 +196,6 @@ void smooth(int32_t &inputVal)
 
     // calculate the average:
     average = total / numReadings;
-    // send it to the computer as ASCII digits
     inputVal = average;
 }
 
