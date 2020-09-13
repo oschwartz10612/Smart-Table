@@ -1,7 +1,7 @@
 //Settings
 //#define OTA 1
-#define DEBUG 1
-//#define NETWORK 1
+//#define DEBUG 1
+#define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -285,7 +285,7 @@ void readEncoder(void *parameter)
         if (Setpoint != previousSetpoint && targetReached)
         {
             targetReached = false;
-            absStepperPos = absStepperPosStable;
+            absStepperPos = absStepperPosStable + encoderVelocity;
         } else if (abs(encoderVelocity) >= START_THRESHOLD && targetReached)
         {
             targetReached = false;
@@ -318,7 +318,7 @@ void readEncoder(void *parameter)
         if (targetReached && (currentMillis - previousMillis) >= SLEEP_TIMEOUT && !timeout)
         {
             stepper.disableOutputs();
-            encoderDelay = 2000;
+            encoderDelay = 1000;
             timeout = true;
 #ifdef DEBUG
             Serial.println("Timeout");
