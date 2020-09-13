@@ -59,7 +59,7 @@ bool targetReached = false;
 double previousSetpoint;
 
 #define DISABLE_TIME 30000
-int32_t disableCounter = 0;
+int32_t timeoutCounter = 0;
 
 double Setpoint = MID_SETPOINT;
 double Input, Output;
@@ -77,7 +77,9 @@ int32_t total = 0;             // the running total
 int32_t average = 0;           // the average
 
 //Timing
-uint16_t encoderDelay = 50;
+uint32_t encoderDelay = 50;
+#define SLEEP_TIMEOUT 600000
+bool timeout = false;
 
 void setup_wifi()
 {
@@ -303,19 +305,22 @@ void readEncoder(void *parameter)
                 preferences.putInt("absStepperPos", absStepperPos);
                 preferences.putInt("positionState", positionState);
             }
-            // if (disableCounter >= DISABLE_TIME)
-            // {
-            //    encoderDelay = 500;
-            // }
-            // else
-            // {
-            //    disableCounter += encoderDelay;
-            // }
+            
+            if (timeoutCounter >= SLEEP_TIMEOUT && !timeout)
+            {
+               encoderDelay = 5000;
+               timeout = true;
+            }
+            else if(!timeout)
+            {
+               timeoutCounter += encoderDelay;
+            }
         }
         else if (!targetReached)
         {
             encoderDelay = 50;
-            //disableCounter = 0;
+            timeoutCounter = 0;
+            timeout = false;
             stepper.enableOutputs();
         }
 
