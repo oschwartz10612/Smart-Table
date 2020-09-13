@@ -32,6 +32,10 @@ PubSubClient client(espClient);
 #define MAX_ENCODER 16384
 #define STEPS_PER_REV 200
 
+#define VEL_MOVE_THRESHOLD 1000
+#define STOP_THRESHOLD 10
+#define START_THRESHOLD 23
+
 //Positions
 #define RIGHT_SETPOINT 8000
 #define MID_SETPOINT 0
@@ -249,20 +253,6 @@ void readEncoder(void *parameter)
 
         uint16_t rawEncoder = encoder.getRawRotation();
 
-        if (Setpoint == 1234)
-        {
-// ZERO out the encoder
-#ifdef DEBUG
-            Serial.println("Zero out");
-#endif
-
-            encoder.setZeroPosition(rawEncoder);
-            absStepperPos = 0;
-            Setpoint = 0;
-            rawEncoder = 0;
-            previousEncoder = 0;
-        }
-
         int16_t encoderVelocity = rawEncoder - previousEncoder;
         if (encoderVelocity > (MAX_ENCODER / 2))
         {
@@ -277,7 +267,7 @@ void readEncoder(void *parameter)
 
         previousEncoder = rawEncoder;
 
-        if (encoderVelocity >= 2000 && targetReached)
+        if (encoderVelocity >= VEL_MOVE_THRESHOLD && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position right!");
@@ -294,7 +284,7 @@ void readEncoder(void *parameter)
                 Setpoint = MID_SETPOINT;
             }
         }
-        else if (encoderVelocity <= -2000 && targetReached)
+        else if (encoderVelocity <= -VEL_MOVE_THRESHOLD && targetReached)
         {
 #ifdef DEBUG
             Serial.println("Change position left!");
@@ -311,7 +301,7 @@ void readEncoder(void *parameter)
                 Setpoint = MID_SETPOINT;
             }
         }
-        else if (abs(encoderVelocity) >= 23 && targetReached)
+        else if (abs(encoderVelocity) >= START_THRESHOLD && targetReached)
         {
             targetReached = false;
         }
@@ -330,7 +320,7 @@ void readEncoder(void *parameter)
             absStepperPos = absStepperPosStable;
         }
 
-        if (Output < 10 && Output > -10)
+        if (Output < STOP_THRESHOLD && Output > -STOP_THRESHOLD)
         {
             if (!targetReached)
             {
@@ -340,6 +330,7 @@ void readEncoder(void *parameter)
                 encoderDelay = 100;
                 targetReached = true;
                 preferences.putInt("absStepperPos", absStepperPos);
+                preferences.putInt("positionState", positionState);
             }
             // if (disableCounter >= DISABLE_TIME)
             // {
@@ -353,7 +344,7 @@ void readEncoder(void *parameter)
         else if (!targetReached)
         {
             encoderDelay = 50;
-            disableCounter = 0;
+            //disableCounter = 0;
             stepper.enableOutputs();
         }
 
@@ -412,6 +403,7 @@ void setup()
 
     preferences.begin("table", false);
 
+    positionState = preferences.getInt("positionState", 0);
     absStepperPos = preferences.getInt("absStepperPos", 0);
     absStepperPosStable = absStepperPos;
 
@@ -425,15 +417,6 @@ void setup()
     Serial.print("Last stepper pos");
     Serial.println(absStepperPos);
 #endif
-
-    if (absStepperPos >= (RIGHT_SETPOINT-100) )
-    {
-        positionState = 2;
-    } else if(absStepperPos <= (LEFT_SETPOINT+100)) {
-        positionState = 1;
-    } else {
-        positionState = 0;
-    }
     
     previousEncoder = encoder.getRawRotation();
 
