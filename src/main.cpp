@@ -32,14 +32,14 @@ PubSubClient client(espClient);
 #define MAX_ENCODER 16384
 #define STEPS_PER_REV 200
 
-#define VEL_MOVE_THRESHOLD 1000
-#define STOP_THRESHOLD 10
-#define START_THRESHOLD 23
-
 //Positions
 #define RIGHT_SETPOINT 8000
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -8000
+
+#define VEL_MOVE_THRESHOLD 1000
+#define STOP_THRESHOLD 10
+#define START_THRESHOLD 23
 
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
@@ -54,20 +54,18 @@ uint16_t previousEncoder;
 int32_t absStepperPos = 0;
 int32_t absStepperPosStable = 0;
 uint8_t positionState = 0; //2 = right, 1 = left, 0 = mid
+
 bool targetReached = false;
 double previousSetpoint;
-bool boot = true;
 
 #define DISABLE_TIME 30000
 int32_t disableCounter = 0;
-
-bool updating = false;
 
 double Setpoint = MID_SETPOINT;
 double Input, Output;
 double Pk = 2;
 double Ik = 0;
-double Dk = 0;
+double Dk = .3;
 
 PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
 
