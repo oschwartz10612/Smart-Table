@@ -1,7 +1,7 @@
 //Settings
 //#define OTA 1
 #define DEBUG 1
-#define NETWORK 1
+//#define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -58,9 +58,6 @@ byte positionState = 0; //2 = right, 1 = left, 0 = mid
 bool targetReached = false;
 double previousSetpoint;
 
-#define DISABLE_TIME 30000
-int32_t timeoutCounter = 0;
-
 double Setpoint = MID_SETPOINT;
 double Input, Output;
 double Pk = 2;
@@ -78,8 +75,9 @@ int32_t average = 0;           // the average
 
 //Timing
 uint32_t encoderDelay = 50;
-#define SLEEP_TIMEOUT 600000
+#define SLEEP_TIMEOUT 10000
 bool timeout = false;
+unsigned long previousMillis = 0;
 
 void setup_wifi()
 {
@@ -224,6 +222,7 @@ void readEncoder(void *parameter)
     while (true)
     {
         uint16_t rawEncoder = encoder.getRawRotation();
+        unsigned long currentMillis = millis();
 
         int16_t encoderVelocity = rawEncoder - previousEncoder;
         if (encoderVelocity > (MAX_ENCODER / 2))
@@ -273,11 +272,7 @@ void readEncoder(void *parameter)
                 Setpoint = MID_SETPOINT;
             }
         }
-        else if (abs(encoderVelocity) >= START_THRESHOLD && targetReached)
-        {
-            targetReached = false;
-            absStepperPos = absStepperPosStable;
-        }
+ 
 
         smooth(absStepperPos);
 
@@ -291,37 +286,43 @@ void readEncoder(void *parameter)
         {
             targetReached = false;
             absStepperPos = absStepperPosStable;
+        } else if (abs(encoderVelocity) >= START_THRESHOLD && targetReached)
+        {
+            targetReached = false;
+            absStepperPos = absStepperPosStable + encoderVelocity;
         }
 
-        if (Output < STOP_THRESHOLD && Output > -STOP_THRESHOLD)
+        if (abs(Output) <= STOP_THRESHOLD && !targetReached)
         {
-            if (!targetReached)
-            {
-                stepper.disableOutputs();
-                absStepperPosStable = absStepperPos;
-                previousSetpoint = Setpoint;
-                encoderDelay = 100;
-                targetReached = true;
-                preferences.putInt("absStepperPos", absStepperPos);
-                preferences.putInt("positionState", positionState);
-            }
-            
-            if (timeoutCounter >= SLEEP_TIMEOUT && !timeout)
-            {
-               encoderDelay = 5000;
-               timeout = true;
-            }
-            else if(!timeout)
-            {
-               timeoutCounter += encoderDelay;
-            }
+            absStepperPosStable = absStepperPos;
+            previousSetpoint = Setpoint;
+            encoderDelay = 100;
+            targetReached = true;
+            preferences.putInt("absStepperPos", absStepperPos);
+            preferences.putInt("positionState", positionState);
+            previousMillis = currentMillis;
+#ifdef DEBUG
+            Serial.println("Stopped");
+#endif
         }
-        else if (!targetReached)
+        if (!targetReached && abs(Output) >= STOP_THRESHOLD)
         {
             encoderDelay = 50;
-            timeoutCounter = 0;
             timeout = false;
             stepper.enableOutputs();
+#ifdef DEBUG
+            Serial.println("Starting");
+#endif
+        }
+
+        if (targetReached && (currentMillis - previousMillis) >= SLEEP_TIMEOUT && !timeout)
+        {
+            stepper.disableOutputs();
+            encoderDelay = 2000;
+            timeout = true;
+#ifdef DEBUG
+            Serial.println("Timeout");
+#endif
         }
 
 #ifdef DEBUG
@@ -330,7 +331,9 @@ void readEncoder(void *parameter)
         Serial.print(",   ");
         Serial.print(absStepperPosStable);
         Serial.print(",   ");
-        Serial.println(Setpoint);
+        Serial.print(Setpoint);
+        Serial.print(",   ");
+        Serial.println(Output);
 #endif
 
         vTaskDelay(encoderDelay);
@@ -372,7 +375,7 @@ void setup()
     stepper.setMaxSpeed(200000);
     stepper.setAcceleration(1000);
     stepper.setEnablePin(EPIN);
-    stepper.disableOutputs();
+    stepper.enableOutputs();
 
     encoder.begin();
 
@@ -390,12 +393,12 @@ void setup()
         smooth(absStepperPos);
         absStepperPos = absStepperPosStable;
     }
-    
+
 #ifdef DEBUG
     Serial.print("Last stepper pos");
     Serial.println(absStepperPos);
 #endif
-    
+
     previousEncoder = encoder.getRawRotation();
 
 #ifdef NETWORK
