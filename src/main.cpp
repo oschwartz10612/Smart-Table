@@ -75,7 +75,7 @@ int32_t average = 0;           // the average
 
 //Timing
 uint32_t encoderDelay = 50;
-#define SLEEP_TIMEOUT 10000
+#define SLEEP_TIMEOUT 900000
 bool timeout = false;
 unsigned long previousMillis = 0;
 
