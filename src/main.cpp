@@ -82,7 +82,7 @@ uint16_t encoderDelay = 50;
 void setup_wifi()
 {
     stepper.disableOutputs();
-    delay(10);
+    vTaskDelay(10);
 // We start by connecting to a WiFi network
 #ifdef DEBUG
     Serial.println();
@@ -94,7 +94,7 @@ void setup_wifi()
 
     while (WiFi.status() != WL_CONNECTED)
     {
-        delay(500);
+        vTaskDelay(500);
 #ifdef DEBUG
         Serial.print(".");
 #endif
@@ -196,7 +196,7 @@ void reconnect()
             Serial.println(" try again in 5 seconds");
 #endif
             // Wait 5 seconds before retrying
-            delay(5000);
+            vTaskDelay(5000);
         }
     }
 }
