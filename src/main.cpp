@@ -234,7 +234,10 @@ void readEncoder(void *parameter)
             encoderVelocity = (rawEncoder + MAX_ENCODER) - previousEncoder;
         }
 
-        absStepperPos += encoderVelocity;
+        if (!targetReached)
+        {
+            absStepperPos += encoderVelocity;
+        }
 
         previousEncoder = rawEncoder;
 
