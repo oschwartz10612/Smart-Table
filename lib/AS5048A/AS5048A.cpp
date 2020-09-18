@@ -27,8 +27,8 @@ SPIClass *vspi = NULL;
 /**
  * Constructor
  */
-AS5048A::AS5048A(byte VSPI_SS, byte VSPI_MISO, byte VSPI_MOSI, byte VSPI_SCLK, bool debug /*=false*/)
-	: _VSPI_SS(VSPI_SS), _VSPI_MISO(VSPI_MISO), _VSPI_MOSI(VSPI_MOSI), _VSPI_SCLK(VSPI_SCLK), errorFlag(false), ocfFlag(false), position(0), debug(debug)
+AS5048A::AS5048A(byte VSPI_SS, byte VSPI_MISO, byte VSPI_MOSI, byte VSPI_SCLK)
+	: _VSPI_SS(VSPI_SS), _VSPI_MISO(VSPI_MISO), _VSPI_MOSI(VSPI_MOSI), _VSPI_SCLK(VSPI_SCLK), errorFlag(false), ocfFlag(false), position(0)
 {
 }
 
@@ -145,15 +145,15 @@ uint16_t AS5048A::getState()
  */
 void AS5048A::printState()
 {
-	if (this->debug)
-	{
+
+#ifdef DEBUG
 		uint16_t data = AS5048A::getState();
 		if (AS5048A::error())
 		{
 			Serial.print("Error bit was set!");
 		}
 		Serial.println(data, BIN);
-	}
+#endif
 }
 
 /**
@@ -250,13 +250,12 @@ uint16_t AS5048A::read(uint16_t registerAddress)
 	//Add a parity bit on the the MSB
 	command |= static_cast<uint16_t>(spiCalcEvenParity(command) << 0xF);
 
-	if (this->debug)
-	{
+#ifdef DEBUG
 		Serial.print("Read (0x");
 		Serial.print(registerAddress, HEX);
 		Serial.print(") with command: 0b");
 		Serial.println(command, BIN);
-	}
+#endif
 
 	//SPI - begin transaction
 	vspi->beginTransaction(this->settings);
@@ -276,19 +275,17 @@ uint16_t AS5048A::read(uint16_t registerAddress)
 	//SPI - end transaction
 	vspi->endTransaction();
 
-	if (this->debug)
-	{
+#ifdef DEBUG
 		Serial.print("Read returned: ");
 		Serial.println(command, BIN);
-	}
+#endif
 
 	//Check if the error bit is set
 	if (response & 0x4000)
 	{
-		if (this->debug)
-		{
-			Serial.println("Setting error bit");
-		}
+#ifdef DEBUG
+		Serial.println("Setting error bit");
+#endif
 		this->errorFlag = true;
 	}
 	else
@@ -316,13 +313,12 @@ uint16_t AS5048A::write(uint16_t registerAddress, uint16_t data)
 	//Add a parity bit on the the MSB
 	command |= static_cast<uint16_t>(spiCalcEvenParity(command) << 0xF);
 
-	if (this->debug)
-	{
+#ifdef DEBUG
 		Serial.print("Write (0x");
 		Serial.print(registerAddress, HEX);
 		Serial.print(") with command: 0b");
 		Serial.println(command, BIN);
-	}
+#endif
 
 	//SPI - begin transaction
 	vspi->beginTransaction(this->settings);
@@ -338,11 +334,10 @@ uint16_t AS5048A::write(uint16_t registerAddress, uint16_t data)
 	//Craft another packet including the data and parity
 	dataToSend |= static_cast<uint16_t>(spiCalcEvenParity(dataToSend) << 0xF);
 
-	if (this->debug)
-	{
+#ifdef DEBUG
 		Serial.print("Sending data to write: ");
 		Serial.println(dataToSend, BIN);
-	}
+#endif
 
 	//Now send the data packet
 	digitalWrite(this->_VSPI_SS, LOW);
@@ -368,8 +363,7 @@ uint16_t AS5048A::write(uint16_t registerAddress, uint16_t data)
 void AS5048A::setDelay()
 {
 	this->esp32_delay = 5;
-	if (this->debug)
-	{
+#ifdef DEBUG
 		Serial.println("AS5048A working with ESP32");
-	}
+#endif
 }

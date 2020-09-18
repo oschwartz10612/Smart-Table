@@ -48,7 +48,7 @@ AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 #define VSPI_SCLK 18
 #define VSPI_SS 5
 
-AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK, false);
+AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK);
 
 uint16_t previousEncoder;
 int32_t absStepperPos = 0;

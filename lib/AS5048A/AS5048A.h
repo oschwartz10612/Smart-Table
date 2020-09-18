@@ -14,7 +14,6 @@ private:
 	bool errorFlag;
 	bool ocfFlag; // Avoid printing OCF flag everytime
 	uint16_t position;
-	bool debug;
 	uint8_t esp32_delay;
 
 	SPISettings settings;
@@ -63,7 +62,7 @@ public:
 	/**
 	 *	Constructor
 	 */
-	AS5048A(uint8_t VSPI_SS, uint8_t VSPI_MISO, uint8_t VSPI_MOSI, uint8_t VSPI_SCLK, bool debug = false);
+	AS5048A(uint8_t VSPI_SS, uint8_t VSPI_MISO, uint8_t VSPI_MOSI, uint8_t VSPI_SCLK);
 
 	/**
 	 * Initialiser
