@@ -76,6 +76,7 @@ int32_t average = 0;           // the average
 //Timing
 uint32_t encoderDelay = 50;
 #define SLEEP_TIMEOUT 900000
+#define COSTING_DELAY 700
 bool timeout = false;
 unsigned long previousMillis = 0;
 
@@ -321,7 +322,7 @@ void readEncoder(void *parameter)
         if (targetReached && (currentMillis - previousMillis) >= SLEEP_TIMEOUT && !timeout)
         {
             stepper.disableOutputs();
-            encoderDelay = 1000;
+            encoderDelay = COSTING_DELAY;
             timeout = true;
 #ifdef DEBUG
             Serial.println("Timeout");
