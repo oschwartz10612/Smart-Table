@@ -1,6 +1,6 @@
 //Settings
 //#define OTA 1
-//#define DEBUG 1
+#define DEBUG 1
 #define NETWORK 1
 
 #include <Arduino.h>
@@ -23,11 +23,6 @@ const char *mqtt_server = MQTT_SERVER;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-#define STEPPIN 33
-#define DIRPIN 32
-#define EPIN 27
-#define STEPPER_SPEED 1500
-
 #define MAX_STEPS 3000
 #define MAX_ENCODER 16384
 #define STEPS_PER_REV 200
@@ -41,13 +36,16 @@ PubSubClient client(espClient);
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
+#define STEPPIN 33
+#define DIRPIN 32
+#define EPIN 27
+#define STEPPER_SPEED 1500
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
 #define VSPI_MISO 19
 #define VSPI_MOSI 23
 #define VSPI_SCLK 18
 #define VSPI_SS 5
-
 AS5048A encoder(VSPI_SS, VSPI_MISO, VSPI_MOSI, VSPI_SCLK);
 
 uint16_t previousEncoder;
@@ -63,7 +61,6 @@ double Input, Output;
 double Pk = 2;
 double Ik = 0;
 double Dk = .3;
-
 PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
 
 //Smoothing
@@ -276,7 +273,6 @@ void readEncoder(void *parameter)
                 Setpoint = MID_SETPOINT;
             }
         }
- 
 
         smooth(absStepperPos);
 
@@ -290,7 +286,8 @@ void readEncoder(void *parameter)
         {
             targetReached = false;
             absStepperPos = absStepperPosStable + encoderVelocity;
-        } else if (abs(encoderVelocity) >= START_THRESHOLD && targetReached)
+        }
+        else if (abs(encoderVelocity) >= START_THRESHOLD && targetReached)
         {
             targetReached = false;
             absStepperPos = absStepperPosStable + encoderVelocity;
@@ -313,9 +310,22 @@ void readEncoder(void *parameter)
         {
             encoderDelay = 50;
             timeout = false;
+            average = absStepperPos;
+            for (uint16_t i = 0; i <= numReadings; i++)
+            {
+                readings[i] = absStepperPos;
+                total += absStepperPos;
+            }
             stepper.enableOutputs();
 #ifdef DEBUG
             Serial.println("Starting");
+
+            Serial.print("Last stepper pos");
+            Serial.println(absStepperPos);
+
+            Serial.print("Smoothed stepper pos:");
+            smooth(absStepperPos)
+            Serial.println(absStepperPos);
 #endif
         }
 
@@ -391,16 +401,21 @@ void setup()
     positionState = preferences.getInt("positionState", 0);
     absStepperPos = preferences.getInt("absStepperPos", 0);
     absStepperPosStable = absStepperPos;
+    average = absStepperPos;
 
     for (uint16_t i = 0; i <= numReadings; i++)
     {
-        smooth(absStepperPos);
-        absStepperPos = absStepperPosStable;
+        readings[i] = absStepperPos;
+        total += absStepperPos;
     }
 
 #ifdef DEBUG
     Serial.print("Last stepper pos");
     Serial.println(absStepperPos);
+
+    Serial.print("Smoothed stepper pos:");
+    smooth(absStepperPos)
+        Serial.println(absStepperPos);
 #endif
 
     previousEncoder = encoder.getRawRotation();
