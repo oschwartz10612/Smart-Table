@@ -73,7 +73,7 @@ int32_t average = 0;           // the average
 //Timing
 uint32_t encoderDelay = 50;
 #define SLEEP_TIMEOUT 600000
-#define COSTING_DELAY 700
+#define COSTING_DELAY 150
 bool timeout = false;
 unsigned long previousMillis = 0;
 bool flag = true;
@@ -298,7 +298,6 @@ void readEncoder(void *parameter)
         {
             absStepperPosStable = absStepperPos;
             previousSetpoint = Setpoint;
-            encoderDelay = 100;
             targetReached = true;
             previousMillis = currentMillis;
 
