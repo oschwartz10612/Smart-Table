@@ -1,7 +1,7 @@
 //Settings
 //#define OTA 1
 #define DEBUG 1
-//#define NETWORK 1
+#define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -72,7 +72,7 @@ int32_t average = 0;           // the average
 
 //Timing
 uint32_t encoderDelay = 50;
-#define SLEEP_TIMEOUT 900000
+#define SLEEP_TIMEOUT 600000
 #define COSTING_DELAY 700
 bool timeout = false;
 unsigned long previousMillis = 0;
