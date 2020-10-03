@@ -1,6 +1,6 @@
 //Settings
 //#define OTA 1
-#define DEBUG 1
+//#define DEBUG 1
 #define NETWORK 1
 
 #include <Arduino.h>
@@ -32,7 +32,7 @@ PubSubClient client(espClient);
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -8000
 
-#define VEL_MOVE_THRESHOLD 1000
+#define VEL_MOVE_THRESHOLD 700
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
@@ -233,13 +233,11 @@ void readEncoder(void *parameter)
             encoderVelocity = (rawEncoder + MAX_ENCODER) - previousEncoder;
         }
 
-        if (!targetReached)
-        {
-            absStepperPos += encoderVelocity;
-        }
+        absStepperPos += encoderVelocity;
 
         previousEncoder = rawEncoder;
 
+        //Change target if pushed
         if (encoderVelocity >= VEL_MOVE_THRESHOLD && targetReached)
         {
 #ifdef DEBUG
@@ -283,53 +281,34 @@ void readEncoder(void *parameter)
 
         stepper.setSpeed(Output);
 
-        if (Setpoint != previousSetpoint && targetReached)
+        //Enable movement and reset encoder
+        if ((Setpoint != previousSetpoint && targetReached) || (abs(encoderVelocity) >= START_THRESHOLD && targetReached))
         {
             targetReached = false;
+            timeout = false;
+            encoderDelay = 50;
+            
             absStepperPos = absStepperPosStable + encoderVelocity;
-        }
-        else if (abs(encoderVelocity) >= START_THRESHOLD && targetReached)
-        {
-            targetReached = false;
-            absStepperPos = absStepperPosStable + encoderVelocity;
-        }
-
-        if (abs(Output) <= STOP_THRESHOLD && !targetReached)
-        {
-            absStepperPosStable = absStepperPos;
-            previousSetpoint = Setpoint;
-            targetReached = true;
-            previousMillis = currentMillis;
 
             for (uint16_t i = 0; i < numReadings; i++)
             {
                 smooth(absStepperPos);
                 absStepperPos = absStepperPosStable;
             }
-
-#ifdef DEBUG
-            Serial.println("Stopped");
-
-            Serial.print("Last stepper pos");
-            Serial.println(absStepperPos);
-
-            Serial.print("Smoothed stepper pos:");
-            smooth(absStepperPos);
-            Serial.println(absStepperPos);
-#endif
-        }
-        if (!targetReached && abs(Output) >= STOP_THRESHOLD && flag)
-        {
-            encoderDelay = 50;
-            timeout = false;
+            
             stepper.enableOutputs();
-            flag = false;
-        }
-        else if (!flag)
-        {
-            flag = true;
         }
 
+        //Disable movement and save encoder position
+        if (abs(Output) <= STOP_THRESHOLD && !targetReached)
+        {
+            absStepperPosStable = absStepperPos;
+            previousSetpoint = Setpoint;
+            targetReached = true;
+            previousMillis = currentMillis;
+        }
+
+        //Timeout to turn off stepper and save position
         if (targetReached && (currentMillis - previousMillis) >= SLEEP_TIMEOUT && !timeout)
         {
             stepper.disableOutputs();
