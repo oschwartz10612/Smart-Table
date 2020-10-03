@@ -273,14 +273,6 @@ void readEncoder(void *parameter)
             }
         }
 
-        smooth(absStepperPos);
-
-        Input = absStepperPos;
-
-        PID.Compute();
-
-        stepper.setSpeed(Output);
-
         //Enable movement and reset encoder
         if ((Setpoint != previousSetpoint && targetReached) || (abs(encoderVelocity) >= START_THRESHOLD && targetReached))
         {
@@ -295,9 +287,16 @@ void readEncoder(void *parameter)
                 smooth(absStepperPos);
                 absStepperPos = absStepperPosStable;
             }
-            
+
             stepper.enableOutputs();
         }
+
+        //Compute PID
+        smooth(absStepperPos);
+        Input = absStepperPos;
+        PID.Compute();
+
+        stepper.setSpeed(Output);
 
         //Disable movement and save encoder position
         if (abs(Output) <= STOP_THRESHOLD && !targetReached)
@@ -349,7 +348,7 @@ void network(void *parameter)
 #ifdef OTA
         ArduinoOTA.handle();
 #endif
-        vTaskDelay(50);
+        vTaskDelay(10);
     }
 }
 
@@ -383,7 +382,7 @@ void setup()
     positionState = preferences.getInt("positionState", 0);
     absStepperPos = preferences.getInt("absStepperPos", 0);
     absStepperPosStable = absStepperPos;
-    average = absStepperPos;
+    previousEncoder = encoder.getRawRotation();
 
     for (uint16_t i = 0; i < numReadings; i++)
     {
@@ -399,8 +398,6 @@ void setup()
     smooth(absStepperPos);
     Serial.println(absStepperPos);
 #endif
-
-    previousEncoder = encoder.getRawRotation();
 
 #ifdef NETWORK
     setup_wifi();
