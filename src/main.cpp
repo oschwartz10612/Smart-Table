@@ -32,7 +32,7 @@ PubSubClient client(espClient);
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -8000
 
-#define VEL_MOVE_THRESHOLD 700
+#define VEL_MOVE_THRESHOLD 1000
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
