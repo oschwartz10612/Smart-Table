@@ -1,7 +1,7 @@
 //Settings
 //#define OTA 1
 #define DEBUG 1
-#define NETWORK 1
+//#define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -62,13 +62,6 @@ double Pk = 2;
 double Ik = 0;
 double Dk = .2;
 PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
-
-//Smoothing
-const uint8_t numReadings = 10;
-int32_t readings[numReadings]; // the readings from the analog input
-int32_t readIndex = 0;         // the index of the current reading
-int32_t total = 0;             // the running total
-int32_t average = 0;           // the average
 
 //Timing
 uint32_t encoderDelay = 30;
@@ -184,29 +177,6 @@ void reconnect()
     }
 }
 
-void smooth(int32_t &inputVal)
-{
-    // subtract the last reading:
-    total = total - readings[readIndex];
-    // read from the sensor:
-    readings[readIndex] = inputVal;
-    // add the reading to the total:
-    total = total + readings[readIndex];
-    // advance to the next position in the array:
-    readIndex = readIndex + 1;
-
-    // if we're at the end of the array...
-    if (readIndex >= numReadings)
-    {
-        // ...wrap around to the beginning:
-        readIndex = 0;
-    }
-
-    // calculate the average:
-    average = total / numReadings;
-    inputVal = average;
-}
-
 void runStepper(void *parameter)
 {
     while (true)
@@ -292,17 +262,10 @@ void readEncoder(void *parameter)
             absStepperPos = absStepperPosStable + encoderVelocity;
             absStepperPosStable += encoderVelocity;
 
-            for (uint16_t i = 0; i < numReadings; i++)
-            {
-                smooth(absStepperPos);
-                absStepperPos = absStepperPosStable;
-            }
-
             stepper.enableOutputs();
         }
 
         //Compute PID
-        smooth(absStepperPos);
         Input = absStepperPos;
         PID.Compute();
 
@@ -399,18 +362,8 @@ void setup()
     absStepperPosStable = absStepperPos;
     previousEncoder = encoder.getRawRotation();
 
-    for (uint16_t i = 0; i < numReadings; i++)
-    {
-        smooth(absStepperPos);
-        absStepperPos = absStepperPosStable;
-    }
-
 #ifdef DEBUG
     Serial.print("Last stepper pos");
-    Serial.println(absStepperPos);
-
-    Serial.print("Smoothed stepper pos:");
-    smooth(absStepperPos);
     Serial.println(absStepperPos);
 #endif
 
