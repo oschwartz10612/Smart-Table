@@ -28,18 +28,18 @@ PubSubClient client(espClient);
 #define STEPS_PER_REV 200
 
 //Positions
-#define RIGHT_SETPOINT 8000
+#define RIGHT_SETPOINT 30000
 #define MID_SETPOINT 0
-#define LEFT_SETPOINT -8000
+#define LEFT_SETPOINT -30000
 
-#define VEL_MOVE_THRESHOLD 300
+#define VEL_MOVE_THRESHOLD 200
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
 #define STEPPIN 33
 #define DIRPIN 32
 #define EPIN 27
-#define STEPPER_SPEED 1800
+#define STEPPER_SPEED 1200
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
 #define VSPI_MISO 19
@@ -58,9 +58,9 @@ double previousSetpoint;
 
 double Setpoint = MID_SETPOINT;
 double Input, Output;
-double Pk = 2;
+double Pk = .8;
 double Ik = 0;
-double Dk = .2;
+double Dk = 0;
 PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
 
 //Timing
@@ -181,12 +181,6 @@ void runStepper(void *parameter)
 {
     while (true)
     {
-#ifdef DEBUG
-        if (Serial.available() > 0)
-        {
-            Setpoint = Serial.parseInt();
-        }
-#endif
         if (!targetReached)
         {
             stepper.runSpeed();
@@ -268,11 +262,10 @@ void readEncoder(void *parameter)
         //Compute PID
         Input = absStepperPos;
         PID.Compute();
-
         stepper.setSpeed(Output);
 
         //Disable movement and save encoder position
-        if (abs(Output) <= STOP_THRESHOLD && !targetReached)
+        if (abs(Output) <= STOP_THRESHOLD && abs(encoderVelocity) <= START_THRESHOLD && !targetReached)
         {
             absStepperPosStable = absStepperPos;
             previousSetpoint = Setpoint;
