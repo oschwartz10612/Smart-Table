@@ -32,7 +32,7 @@ PubSubClient client(espClient);
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -8000
 
-#define VEL_MOVE_THRESHOLD 700
+#define VEL_MOVE_THRESHOLD 300
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
@@ -246,24 +246,6 @@ void readEncoder(void *parameter)
 
         previousEncoder = rawEncoder;
 
-        //Enable movement and reset encoder
-        if ((Setpoint != previousSetpoint && targetReached) || (abs(encoderVelocity) >= START_THRESHOLD && targetReached))
-        {
-            targetReached = false;
-            timeout = false;
-            encoderDelay = 30;
-
-            absStepperPos = absStepperPosStable + encoderVelocity;
-
-            for (uint16_t i = 0; i < numReadings; i++)
-            {
-                smooth(absStepperPos);
-                absStepperPos = absStepperPosStable;
-            }
-
-            stepper.enableOutputs();
-        }
-
         //Change target if pushed
         if (encoderVelocity >= VEL_MOVE_THRESHOLD && targetReached)
         {
@@ -298,6 +280,25 @@ void readEncoder(void *parameter)
                 positionState = 0;
                 Setpoint = MID_SETPOINT;
             }
+        }
+
+        //Enable movement and reset encoder
+        if ((Setpoint != previousSetpoint && targetReached) || (abs(encoderVelocity) >= START_THRESHOLD && targetReached))
+        {
+            targetReached = false;
+            timeout = false;
+            encoderDelay = 30;
+
+            absStepperPos = absStepperPosStable + encoderVelocity;
+            absStepperPosStable += encoderVelocity;
+
+            for (uint16_t i = 0; i < numReadings; i++)
+            {
+                smooth(absStepperPos);
+                absStepperPos = absStepperPosStable;
+            }
+
+            stepper.enableOutputs();
         }
 
         //Compute PID
@@ -339,7 +340,10 @@ void readEncoder(void *parameter)
         Serial.print(",   ");
         Serial.print(Setpoint);
         Serial.print(",   ");
-        Serial.println(Output);
+        Serial.print(Output);
+        Serial.print(",   ");
+        Serial.println(targetReached);
+
 #endif
 
         vTaskDelay(encoderDelay);
