@@ -1,6 +1,6 @@
 //Settings
 //#define OTA 1
-//#define DEBUG 1
+#define DEBUG 1
 #define NETWORK 1
 
 #include <Arduino.h>
@@ -32,14 +32,14 @@ PubSubClient client(espClient);
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -8000
 
-#define VEL_MOVE_THRESHOLD 1000
+#define VEL_MOVE_THRESHOLD 700
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
 #define STEPPIN 33
 #define DIRPIN 32
 #define EPIN 27
-#define STEPPER_SPEED 1500
+#define STEPPER_SPEED 1800
 AccelStepper stepper(AccelStepper::DRIVER, STEPPIN, DIRPIN);
 
 #define VSPI_MISO 19
@@ -71,9 +71,9 @@ int32_t total = 0;             // the running total
 int32_t average = 0;           // the average
 
 //Timing
-uint32_t encoderDelay = 50;
+uint32_t encoderDelay = 30;
 #define SLEEP_TIMEOUT 600000
-#define COSTING_DELAY 150
+#define COSTING_DELAY 50
 bool timeout = false;
 unsigned long previousMillis = 0;
 bool flag = true;
@@ -131,11 +131,20 @@ void callback(char *topic, byte *payload, unsigned int length)
 #endif
 
         if (msg == "right")
+        {
             Setpoint = RIGHT_SETPOINT;
-        if (msg == "mid")
+            positionState = 2;
+        }
+        else if (msg == "mid")
+        {
             Setpoint = MID_SETPOINT;
-        if (msg == "left")
+            positionState = 0;
+        }
+        else if (msg == "left")
+        {
             Setpoint = LEFT_SETPOINT;
+            positionState = 1;
+        }
     }
 }
 
@@ -237,6 +246,24 @@ void readEncoder(void *parameter)
 
         previousEncoder = rawEncoder;
 
+        //Enable movement and reset encoder
+        if ((Setpoint != previousSetpoint && targetReached) || (abs(encoderVelocity) >= START_THRESHOLD && targetReached))
+        {
+            targetReached = false;
+            timeout = false;
+            encoderDelay = 30;
+
+            absStepperPos = absStepperPosStable + encoderVelocity;
+
+            for (uint16_t i = 0; i < numReadings; i++)
+            {
+                smooth(absStepperPos);
+                absStepperPos = absStepperPosStable;
+            }
+
+            stepper.enableOutputs();
+        }
+
         //Change target if pushed
         if (encoderVelocity >= VEL_MOVE_THRESHOLD && targetReached)
         {
@@ -273,24 +300,6 @@ void readEncoder(void *parameter)
             }
         }
 
-        //Enable movement and reset encoder
-        if ((Setpoint != previousSetpoint && targetReached) || (abs(encoderVelocity) >= START_THRESHOLD && targetReached))
-        {
-            targetReached = false;
-            timeout = false;
-            encoderDelay = 50;
-            
-            absStepperPos = absStepperPosStable + encoderVelocity;
-
-            for (uint16_t i = 0; i < numReadings; i++)
-            {
-                smooth(absStepperPos);
-                absStepperPos = absStepperPosStable;
-            }
-
-            stepper.enableOutputs();
-        }
-
         //Compute PID
         smooth(absStepperPos);
         Input = absStepperPos;
@@ -322,6 +331,8 @@ void readEncoder(void *parameter)
 
 #ifdef DEBUG
 
+        Serial.print(encoderVelocity);
+        Serial.print(",   ");
         Serial.print(absStepperPos);
         Serial.print(",   ");
         Serial.print(absStepperPosStable);
