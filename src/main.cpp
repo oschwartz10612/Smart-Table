@@ -298,7 +298,9 @@ void readEncoder(void *parameter)
         Serial.print(",   ");
         Serial.print(Output);
         Serial.print(",   ");
-        Serial.println(targetReached);
+        Serial.print(targetReached);
+        Serial.print(",   ");
+        Serial.println(currentMillis - previousMillis);
 
 #endif
 
@@ -334,31 +336,6 @@ void keepAlive(void *parameter)
 
 void setup()
 {
-#ifdef DEBUG
-    Serial.begin(115200);
-#endif
-
-    stepper.setMaxSpeed(200000);
-    stepper.setAcceleration(1000);
-    stepper.setEnablePin(EPIN);
-    stepper.enableOutputs();
-
-    encoder.begin();
-
-    PID.SetMode(AUTOMATIC);
-    PID.SetOutputLimits(-STEPPER_SPEED, STEPPER_SPEED);
-
-    preferences.begin("table", false);
-
-    positionState = preferences.getInt("positionState", 0);
-    absStepperPos = preferences.getInt("absStepperPos", 0);
-    absStepperPosStable = absStepperPos;
-    previousEncoder = encoder.getRawRotation();
-
-#ifdef DEBUG
-    Serial.print("Last stepper pos");
-    Serial.println(absStepperPos);
-#endif
 
 #ifdef NETWORK
     setup_wifi();
@@ -388,6 +365,32 @@ void setup()
         NULL,                     // Task handle
         1                         // Core you want to run the task on (0 or 1)
     );
+#endif
+
+#ifdef DEBUG
+    Serial.begin(115200);
+#endif
+
+    stepper.setMaxSpeed(200000);
+    stepper.setAcceleration(1000);
+    stepper.setEnablePin(EPIN);
+    stepper.enableOutputs();
+
+    encoder.begin();
+
+    PID.SetMode(AUTOMATIC);
+    PID.SetOutputLimits(-STEPPER_SPEED, STEPPER_SPEED);
+
+    preferences.begin("table", false);
+
+    positionState = preferences.getInt("positionState", 0);
+    absStepperPos = preferences.getInt("absStepperPos", 0);
+    absStepperPosStable = absStepperPos;
+    previousEncoder = encoder.getRawRotation();
+
+#ifdef DEBUG
+    Serial.print("Last stepper pos");
+    Serial.println(absStepperPos);
 #endif
 
     xTaskCreatePinnedToCore(
