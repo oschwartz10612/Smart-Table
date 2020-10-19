@@ -1,7 +1,7 @@
 //Settings
 //#define OTA 1
-#define DEBUG 1
-//#define NETWORK 1
+//#define DEBUG 1
+#define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -28,11 +28,11 @@ PubSubClient client(espClient);
 #define STEPS_PER_REV 200
 
 //Positions
-#define RIGHT_SETPOINT 30000
+#define RIGHT_SETPOINT 40000
 #define MID_SETPOINT 0
-#define LEFT_SETPOINT -30000
+#define LEFT_SETPOINT -40000
 
-#define VEL_MOVE_THRESHOLD 200
+#define VEL_MOVE_THRESHOLD 1400
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
@@ -65,7 +65,7 @@ PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
 
 //Timing
 uint32_t encoderDelay = 30;
-#define SLEEP_TIMEOUT 600000
+#define SLEEP_TIMEOUT 60000
 #define COSTING_DELAY 50
 bool timeout = false;
 unsigned long previousMillis = 0;
@@ -349,7 +349,7 @@ void setup()
     xTaskCreatePinnedToCore(
         keepAlive,                // Function that should be called
         "Maintain wifi and MQTT", // Name of the task (for debugging)
-        2000,                     // Stack size (bytes)
+        3000,                     // Stack size (bytes)
         NULL,                     // Parameter to pass
         2,                        // Task priority
         NULL,                     // Task handle
@@ -359,7 +359,7 @@ void setup()
     xTaskCreatePinnedToCore(
         network,                  // Function that should be called
         "Maintain wifi and MQTT", // Name of the task (for debugging)
-        2000,                     // Stack size (bytes)
+        3000,                     // Stack size (bytes)
         NULL,                     // Parameter to pass
         2,                        // Task priority
         NULL,                     // Task handle
