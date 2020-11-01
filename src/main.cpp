@@ -1,6 +1,6 @@
 //Settings
 //#define OTA 1
-//#define DEBUG 1
+#define DEBUG 1
 #define NETWORK 1
 
 #include <Arduino.h>
@@ -23,16 +23,14 @@ const char *mqtt_server = MQTT_SERVER;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-#define MAX_STEPS 3000
-#define MAX_ENCODER 16384
-#define STEPS_PER_REV 200
-
 //Positions
+#define MAX_ENCODER 16384
+
 #define RIGHT_SETPOINT 40000
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -40000
 
-#define VEL_MOVE_THRESHOLD 1400
+#define VEL_MOVE_THRESHOLD 140
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
