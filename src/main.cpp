@@ -71,8 +71,7 @@ bool flag = true;
 
 void setup_wifi()
 {
-    stepper.disableOutputs();
-    delay(10);
+    WiFi.disconnect();
 // We start by connecting to a WiFi network
 #ifdef DEBUG
     Serial.println();
@@ -90,7 +89,6 @@ void setup_wifi()
 #endif
     }
 
-    randomSeed(micros());
 #ifdef DEBUG
     Serial.println("");
     Serial.println("WiFi connected");
@@ -310,10 +308,6 @@ void network(void *parameter)
 {
     while (true)
     {
-        if (!client.connected())
-        {
-            reconnect();
-        }
         client.loop();
 
 #ifdef OTA
@@ -329,6 +323,16 @@ void keepAlive(void *parameter)
     {
         client.publish("home-assistant/smart_table/availability", "online");
         vTaskDelay(60000);
+        if (!client.connected())
+        {
+            reconnect();
+        }
+
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            Serial.println("wifi disconnected ");
+            setup_wifi();
+        }
     }
 }
 
