@@ -330,7 +330,9 @@ void keepAlive(void *parameter)
 
         if (WiFi.status() != WL_CONNECTED)
         {
+            #ifdef DEBUG
             Serial.println("wifi disconnected ");
+            #endif
             setup_wifi();
         }
     }
