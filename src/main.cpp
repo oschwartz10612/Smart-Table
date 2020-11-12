@@ -212,6 +212,9 @@ void readEncoder(void *parameter)
 #ifdef DEBUG
             Serial.println("Change position right!");
 #endif
+#ifdef NETWORK
+            client.publish("home-assistant/smart_table/logs", "moving right");
+#endif
 
             if (positionState == 0)
             {
@@ -228,6 +231,9 @@ void readEncoder(void *parameter)
         {
 #ifdef DEBUG
             Serial.println("Change position left!");
+#endif
+#ifdef NETWORK
+            client.publish("home-assistant/smart_table/logs", "moving left");
 #endif
 
             if (positionState == 0)
@@ -270,6 +276,9 @@ void readEncoder(void *parameter)
             previousSetpoint = Setpoint;
             targetReached = true;
             previousMillis = currentMillis;
+#ifdef NETWORK
+            client.publish("home-assistant/smart_table/logs", "move end");
+#endif
         }
 
         //Timeout to turn off stepper and save position
