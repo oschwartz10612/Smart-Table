@@ -134,7 +134,24 @@ void callback(char *topic, byte *payload, unsigned int length)
             Setpoint = LEFT_SETPOINT;
             positionState = 1;
         }
-    } 
+    }
+    else if (strcmp(topic, "home-assistant/smart_table/command") == 0)
+    {
+        char *command;
+        command = strtok(msg, " ");
+        Serial.println(command);
+
+        if (strcmp(command, "SET") == 0)
+        { // SET
+            command = strtok(NULL, " ");
+            if (strcmp(command, ""))
+            {
+            }
+        }
+        else
+        { // GET
+        }
+    }
 }
 
 void reconnect()
