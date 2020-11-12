@@ -106,7 +106,8 @@ void callback(char *topic, byte *payload, unsigned int length)
     Serial.print("] ");
 #endif
 
-    char * msg = (char *)payload;
+    payload[length] = '\0';
+    char *msg = (char *)payload;
 #ifdef DEBUG
     Serial.println(msg);
 #endif
