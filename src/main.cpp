@@ -63,7 +63,7 @@ PID PID(&Input, &Output, &Setpoint, Pk, Ik, Dk, DIRECT);
 
 //Timing
 uint32_t encoderDelay = 30;
-#define SLEEP_TIMEOUT 60000
+#define SLEEP_TIMEOUT 300000
 #define COSTING_DELAY 50
 bool timeout = false;
 unsigned long previousMillis = 0;
@@ -253,6 +253,9 @@ void readEncoder(void *parameter)
             absStepperPosStable += encoderVelocity;
 
             stepper.enableOutputs();
+#ifdef NETWORK
+            client.publish("home-assistant/smart_table/logs", "move begin");
+#endif
         }
 
         //Compute PID
@@ -279,6 +282,10 @@ void readEncoder(void *parameter)
             preferences.putInt("positionState", positionState);
 #ifdef DEBUG
             Serial.println("Timeout");
+#endif
+
+#ifdef NETWORK
+            client.publish("home-assistant/smart_table/logs", "motor disabled");
 #endif
         }
 
@@ -321,20 +328,21 @@ void keepAlive(void *parameter)
 {
     while (true) //Publish alive message to home assistant every minute
     {
-        client.publish("home-assistant/smart_table/availability", "online");
-        vTaskDelay(60000);
+        if (WiFi.status() != WL_CONNECTED)
+        {
+#ifdef DEBUG
+            Serial.println("wifi disconnected ");
+#endif
+            setup_wifi();
+        }
+
         if (!client.connected())
         {
             reconnect();
         }
+        client.publish("home-assistant/smart_table/availability", "online");
 
-        if (WiFi.status() != WL_CONNECTED)
-        {
-            #ifdef DEBUG
-            Serial.println("wifi disconnected ");
-            #endif
-            setup_wifi();
-        }
+        vTaskDelay(60000);
     }
 }
 
