@@ -106,8 +106,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     Serial.print("] ");
 #endif
 
-    payload[length] = '\0';
-    String msg = String((char *)payload);
+    char * msg = (char *)payload;
 #ifdef DEBUG
     Serial.println(msg);
 #endif
@@ -119,22 +118,22 @@ void callback(char *topic, byte *payload, unsigned int length)
         Serial.println("Changing position");
 #endif
 
-        if (msg == "right")
+        if (strcmp(msg, "right") == 0)
         {
             Setpoint = RIGHT_SETPOINT;
             positionState = 2;
         }
-        else if (msg == "mid")
+        else if (strcmp(msg, "mid") == 0)
         {
             Setpoint = MID_SETPOINT;
             positionState = 0;
         }
-        else if (msg == "left")
+        else if (strcmp(msg, "left") == 0)
         {
             Setpoint = LEFT_SETPOINT;
             positionState = 1;
         }
-    }
+    } 
 }
 
 void reconnect()
@@ -158,6 +157,7 @@ void reconnect()
             client.publish("home-assistant/smart_table/availability", "online");
             // ... and resubscribe
             client.subscribe("home-assistant/smart_table/set");
+            client.subscribe("home-assistant/smart_table/command");
             client.subscribe("home-assistant/smart_table/set_position");
         }
         else
