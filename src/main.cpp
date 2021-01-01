@@ -123,16 +123,25 @@ void callback(char *topic, byte *payload, unsigned int length)
         {
             Setpoint = RIGHT_SETPOINT;
             positionState = 2;
+#ifdef NETWORK
+            client.publish("home-assistant/smart_table/move_direction", "right");
+#endif
         }
         else if (strcmp(msg, "mid") == 0)
         {
             Setpoint = MID_SETPOINT;
             positionState = 0;
+#ifdef NETWORK
+            client.publish("home-assistant/smart_table/move_direction", "mid");
+#endif
         }
         else if (strcmp(msg, "left") == 0)
         {
             Setpoint = LEFT_SETPOINT;
             positionState = 1;
+#ifdef NETWORK
+            client.publish("home-assistant/smart_table/move_direction", "right");
+#endif
         }
     }
     else if (strcmp(topic, "home-assistant/smart_table/command") == 0)
@@ -230,19 +239,22 @@ void readEncoder(void *parameter)
 #ifdef DEBUG
             Serial.println("Change position right!");
 #endif
-#ifdef NETWORK
-            client.publish("home-assistant/smart_table/logs", "moving right");
-#endif
 
             if (positionState == 0)
             {
                 positionState = 2;
                 Setpoint = RIGHT_SETPOINT;
+#ifdef NETWORK
+                client.publish("home-assistant/smart_table/move_direction", "right");
+#endif
             }
             else
             {
                 positionState = 0;
                 Setpoint = MID_SETPOINT;
+#ifdef NETWORK
+                client.publish("home-assistant/smart_table/move_direction", "mid");
+#endif
             }
         }
         else if (encoderVelocity <= -VEL_MOVE_THRESHOLD && targetReached)
@@ -250,19 +262,22 @@ void readEncoder(void *parameter)
 #ifdef DEBUG
             Serial.println("Change position left!");
 #endif
-#ifdef NETWORK
-            client.publish("home-assistant/smart_table/logs", "moving left");
-#endif
 
             if (positionState == 0)
             {
                 positionState = 1;
                 Setpoint = LEFT_SETPOINT;
+#ifdef NETWORK
+                client.publish("home-assistant/smart_table/move_direction", "left");
+#endif
             }
             else
             {
                 positionState = 0;
                 Setpoint = MID_SETPOINT;
+#ifdef NETWORK
+                client.publish("home-assistant/smart_table/move_direction", "mid");
+#endif
             }
         }
 
@@ -278,7 +293,7 @@ void readEncoder(void *parameter)
 
             stepper.enableOutputs();
 #ifdef NETWORK
-            client.publish("home-assistant/smart_table/logs", "move begin");
+            client.publish("home-assistant/smart_table/log", "move begin");
 #endif
         }
 
@@ -295,7 +310,8 @@ void readEncoder(void *parameter)
             targetReached = true;
             previousMillis = currentMillis;
 #ifdef NETWORK
-            client.publish("home-assistant/smart_table/logs", "move end");
+            client.publish("home-assistant/smart_table/log", "move end");
+            client.publish("home-assistant/smart_table/move_direction", "none");
 #endif
         }
 
@@ -312,7 +328,7 @@ void readEncoder(void *parameter)
 #endif
 
 #ifdef NETWORK
-            client.publish("home-assistant/smart_table/logs", "motor disabled");
+            client.publish("home-assistant/smart_table/log", "motor disabled");
 #endif
         }
 
