@@ -1,6 +1,6 @@
 //Settings
 //#define OTA 1
-#define DEBUG 1
+//#define DEBUG 1
 #define NETWORK 1
 
 #include <Arduino.h>
@@ -30,7 +30,7 @@ PubSubClient client(espClient);
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -40000
 
-#define VEL_MOVE_THRESHOLD 140
+#define VEL_MOVE_THRESHOLD 180
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
