@@ -9,6 +9,7 @@
 #include <Preferences.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include "ESP32TimerInterrupt.h"
 #include <PID_v1.h>
 #include "keys.h"
 
@@ -30,7 +31,7 @@ PubSubClient client(espClient);
 #define MID_SETPOINT 0
 #define LEFT_SETPOINT -40000
 
-#define VEL_MOVE_THRESHOLD 180
+#define VEL_MOVE_THRESHOLD 220
 #define STOP_THRESHOLD 10
 #define START_THRESHOLD 23
 
@@ -68,6 +69,18 @@ uint32_t encoderDelay = 30;
 bool timeout = false;
 unsigned long previousMillis = 0;
 bool flag = true;
+
+void IRAM_ATTR TimerHandler0(void)
+{
+    if (!targetReached)
+    {
+        stepper.runSpeed();
+    }
+}
+
+#define TIMER0_INTERVAL_MS 1
+
+ESP32Timer ITimer0(0);
 
 void setup_wifi()
 {
@@ -197,18 +210,6 @@ void reconnect()
             // Wait 5 seconds before retrying
             vTaskDelay(5000);
         }
-    }
-}
-
-void runStepper(void *parameter)
-{
-    while (true)
-    {
-        if (!targetReached)
-        {
-            stepper.runSpeed();
-        }
-        vTaskDelay(1);
     }
 }
 
@@ -363,7 +364,7 @@ void network(void *parameter)
 #ifdef OTA
         ArduinoOTA.handle();
 #endif
-        vTaskDelay(10);
+        vTaskDelay(50);
     }
 }
 
@@ -448,15 +449,15 @@ void setup()
     Serial.println(absStepperPos);
 #endif
 
-    xTaskCreatePinnedToCore(
-        runStepper,             // Function that should be called
-        "Run Stepper at Speed", // Name of the task (for debugging)
-        1000,                   // Stack size (bytes)
-        NULL,                   // Parameter to pass
-        1,                      // Task priority
-        NULL,                   // Task handle
-        0                       // Core you want to run the task on (0 or 1)
-    );
+    if (ITimer0.attachInterruptInterval(TIMER0_INTERVAL_MS * 1000, TimerHandler0))
+    {
+#ifdef DEBUG
+
+        Serial.println("Starting  ITimer0 OK, millis() = " + String(millis()));
+#endif
+    }
+    else
+        Serial.println("Can't set ITimer0. Select another freq. or timer");
 
     xTaskCreatePinnedToCore(
         readEncoder,                 // Function that should be called
