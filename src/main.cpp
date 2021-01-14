@@ -6,7 +6,6 @@
 #include <Arduino.h>
 #include "AS5048A.h"
 #include <AccelStepper.h>
-#include <Preferences.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include "ESP32TimerInterrupt.h"
@@ -16,8 +15,6 @@
 #ifdef OTA
 #include <ArduinoOTA.h>
 #endif
-
-Preferences preferences;
 
 const char *mqtt_server = MQTT_SERVER;
 
@@ -322,8 +319,6 @@ void readEncoder(void *parameter)
             stepper.disableOutputs();
             encoderDelay = COSTING_DELAY;
             timeout = true;
-            preferences.putInt("absStepperPos", absStepperPos);
-            preferences.putInt("positionState", positionState);
 #ifdef DEBUG
             Serial.println("Timeout");
 #endif
@@ -437,10 +432,8 @@ void setup()
     PID.SetMode(AUTOMATIC);
     PID.SetOutputLimits(-STEPPER_SPEED, STEPPER_SPEED);
 
-    preferences.begin("table", false);
-
-    positionState = preferences.getInt("positionState", 0);
-    absStepperPos = preferences.getInt("absStepperPos", 0);
+    positionState = 0;
+    absStepperPos = 0;
     absStepperPosStable = absStepperPos;
     previousEncoder = encoder.getRawRotation();
 
