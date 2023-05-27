@@ -1,7 +1,7 @@
 //Settings
 //#define OTA 1
-#define DEBUG 1
-#define NETWORK 1
+// #define DEBUG 1
+// #define NETWORK 1
 
 #include <Arduino.h>
 #include "AS5048A.h"
@@ -362,7 +362,7 @@ void setup()
         2,                        // Task priority
         NULL,                     // Task handle
         1                         // Core you want to run the task on (0 or 1)
-    );
+    );   
 #endif
 
 #ifdef DEBUG
